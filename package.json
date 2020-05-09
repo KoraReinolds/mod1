@@ -1,0 +1,16 @@
+{
+  "name": "mod-1",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.17.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "postinstall": "npm install express",
+    "start": "node server.js"
+  },
+  "author": "mskiles",
+  "license": "ISC"
+}
