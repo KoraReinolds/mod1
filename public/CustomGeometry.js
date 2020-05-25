@@ -104,7 +104,7 @@ class CustomGeometry extends BufferGeometry {
   initBuffersTop() {
     for (let z = 0; z <= this.z; z++) {
       for (let x = 0; x <= this.x; x++) {
-        this.positions.push(x - this.x / 2, -0.1, z - this.z / 2);
+        this.positions.push(x - this.x / 2, 1.0, z - this.z / 2);
         this.uvs.push(x / this.x, z / this.z);
       }
     }
@@ -112,7 +112,7 @@ class CustomGeometry extends BufferGeometry {
   initBuffersBottom() {
     for (let z = 0; z <= this.z; z++) {
       for (let x = 0; x <= this.x; x++) {
-        this.positions.push(x - this.x / 2, -0.1, z - this.z / 2);
+        this.positions.push(x - this.x / 2, 0.0, z - this.z / 2);
         this.uvs.push(x / this.x, z / this.z);
       }
     }

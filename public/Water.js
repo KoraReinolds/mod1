@@ -138,7 +138,7 @@ class Water extends Mesh {
 
       this.updateTextureMatrix( camera );
       this.updateFlow();
-      this.geometry.move(1000);
+      this.geometry.drawCubes();
       this.visible = false;
       reflector.matrixWorld.copy( this.matrixWorld );
       reflector.onBeforeRender( renderer, scene, camera );

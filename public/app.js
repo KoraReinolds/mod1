@@ -2,6 +2,7 @@ import { OrbitControls } from './jsm/controls/OrbitControls.js';
 import Water from './Water.js';
 import SurfaceMaterial from './SurfaceMaterial.js';
 import HeightMap from './HeightMap.js';
+import SurfaceGeometry from './SurfaceGeometry.js';
 import {
   WebGLRenderer,
   ImageLoader,
@@ -20,6 +21,7 @@ function init({ width, height, y, data }) {
   let surf;
   let camera;
   let controls;
+  let waterCoords = [];
   const scene = new Scene();
   let points = [
     [10, 10, 10],
@@ -52,8 +54,8 @@ function init({ width, height, y, data }) {
   }
 
   function initSurface() {
-    const surfGeometry = new HeightMap({ x: width, y, z: height, data });
-    // const surfGeometry = new SurfaceGeometry({ points, size });
+    // const surfGeometry = new HeightMap({ x: width, y, z: height, data });
+    const surfGeometry = new SurfaceGeometry({ points, size });
     surfGeometry.setHeight();
     surf = new Mesh(
       surfGeometry,
@@ -119,7 +121,7 @@ const src = './textures/hm/hm1.png';
 imgLoader.load( src, function(image) {
 
     const { width, height } = image;
-    const scaleHeight = 512;
+    const scaleHeight = 32;
     const scaleWidth = Math.floor(height * scaleHeight / width);
     const ctx = document.createElement('canvas').getContext('2d');
     ctx.canvas.width = image.width = scaleWidth;

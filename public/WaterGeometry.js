@@ -1,81 +1,97 @@
 import {
+	BufferAttribute,
+  BufferGeometry,
 } from "../../../build/three.module.js";
 import CustomGeometry from './CustomGeometry.js';
 
-class WaterGeometry extends CustomGeometry {
+class WaterGeometry extends BufferGeometry {
+
   constructor(map) {
-    super(map);
+    super();
+    this.cube = new CustomGeometry({x: 1, y: 1, z: 1});
+    this.map = map;
+    this.maxLvl = 1; // reflection plane lvl
+    this.maxCubes = map.x * map.y * map.z;
+    console.log(this.maxCubes)
+    this.indexes = this.getIndexes();
+    this.positions = this.getPositions();
+    this.uvs = this.getUVs();
     
-    this.maxLvl = 1;
-    this.points = [];
-    this.map = map.points;
-    this.curLvl = 0;
-    this.lvls = Array.from(new Array(map.y), () => []);
-    this.initWave(1);
-  }
-
-  setMinPoint(x, z, lvl) {
-    const bottomPlaneOffset = (this.x + 1) * (this.z + 1);
-    this.attributes.position.array[(z * (this.x + 1) + x + bottomPlaneOffset) * 3 + 1] = lvl;
-    this.map[x][z].min = lvl;
-  }
-
-  setMaxPoint(x, z, lvl) {
-    this.attributes.position.array[(z * (this.x + 1) + x) * 3 + 1] = lvl;
-  }
-
-  initWave(lvl) {
-    if (lvl < this.y) {
-      for( let i = 0; i < this.x + 1; i++) {
-      // for( let i = 0; i < 1; i++) {
-        const x = i;
-        const y = lvl;
-        const z = 0;
-        this.lvls[y].push({ x, z });
-        this.points.push({ x, y, z });
-        this.setMaxPoint(x, z, y);
+    this.setIndex(this.indexes);
+    this.setAttribute(
+      'position',
+      new BufferAttribute(new Float32Array(this.positions), 3)
+    );
+    this.computeVertexNormals()
+    this.setAttribute(
+      'uv',
+      new BufferAttribute(new Float32Array(this.uvs), 2)
+    );
+    this.attributes.position.needsUpdate = true;
+    
+    this.points = []
+    for (let x = 0; x < this.map.x; x++) {
+      for (let y = 0; y < this.map.y; y++) {
+        for (let z = 0; z < this.map.z; z++) {
+          this.points.push({x, y, z})
+        }
       }
     }
+
+    this.drawCubes();
+
   }
 
-  move(countPoints) {
-    for ( let i = 0; i < countPoints; i++ ) {
-      if (this.points.length && this.maxLvl < this.y) {
+  drawCubes() {
+    let cube = 0;
+    this.points.forEach((coords) => {
+      this.moveCube(cube++, coords);
+    });
+  }
 
-        const point = this.points.shift();
-        const { x, y, z } = point;
-        const curPoint = this.map[x][z];
-        const rightPoint = z != this.z ? this.map[x][z + 1] : null;
-        const leftPoint = z != 0 ? this. map[x][z - 1] : null;
-        const backPoint = x != 0 ? this. map[x - 1][z] : null;
-        const fowardPoint = x != this.x ? this.map[x + 1][z] : null;
-        this.setMaxPoint(x, z, y);
-        
-        if (curPoint.min === undefined) {
-          this.setMinPoint(x, z, y - 1);
-        }
-        if (leftPoint && (leftPoint.max < y || leftPoint.max === undefined)) {
-          leftPoint.max = y;
-          this.points.push({ x, z: z - 1, y });
-        }
-        if (rightPoint && (rightPoint.max < y || rightPoint.max === undefined)) {
-          rightPoint.max = y;
-          this.points.push({ x, z: z + 1, y });
-        }
-        if (backPoint && (backPoint.max < y || backPoint.max === undefined)) {
-          backPoint.max = y;
-          this.points.push({ x: x - 1, z, y });
-        }
-        if (fowardPoint && (fowardPoint.max < y || fowardPoint.max === undefined)) {
-          fowardPoint.max = y;
-          this.points.push({ x: x + 1, z, y });
-        }
-
+  moveCube(cube, {x, y, z}) {
+    const index = cube * this.cube.positions.length;
+    const pos = this.attributes.position.array;
+    for (let [i, val] of Object.entries(this.cube.positions)) {
+      if ((i + 1) % 3 === 1) {
+        pos[+i + index] += x - this.map.x / 2 + 0.5;
+      } else if ((i + 1) % 3 === 2) {
+        pos[+i + index] += y;
       } else {
-        this.initWave(++this.maxLvl);
+        pos[+i + index] += z - this.map.z / 2 + 0.5;
       }
-      this.attributes.position.needsUpdate = true;
     }
+  }
+
+  getUVs() {
+    const uvs = []
+    for (let cube = 0; cube < this.maxCubes; cube++) {
+      for (let i of this.cube.uvs) {
+        uvs.push(i);
+      }
+    }
+    return uvs;
+  }
+
+  getPositions() {
+    const positions = []
+    for (let cube = 0; cube < this.maxCubes; cube++) {
+      for (let i of this.cube.positions) {
+        positions.push(i);
+      }
+    }
+    return positions;
+  }
+
+  getIndexes() {
+    const indexes = []
+    const length = this.cube.positions.length / 3;
+    for (let cube = 0; cube < this.maxCubes; cube++) {
+      for (let i of this.cube.indexes) {
+        indexes.push(cube * length + i);
+      }
+    }
+    return indexes;
   }
 
 }
