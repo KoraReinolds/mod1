@@ -47,18 +47,20 @@ class WaterGeometry extends BufferGeometry {
     this.points.forEach((coords) => {
       this.moveCube(cube++, coords);
     });
+    this.attributes.position.needsUpdate = true;
   }
 
   moveCube(cube, {x, y, z}) {
     const index = cube * this.cube.positions.length;
+    const posCube = this.cube.attributes.position.array;
     const pos = this.attributes.position.array;
     for (let [i, val] of Object.entries(this.cube.positions)) {
       if ((i + 1) % 3 === 1) {
-        pos[+i + index] += x - this.map.x / 2 + 0.5;
+        pos[+i + index] = posCube[+i] + x - this.map.x / 2 + 0.5;
       } else if ((i + 1) % 3 === 2) {
-        pos[+i + index] += y;
+        pos[+i + index] = posCube[+i] + y;
       } else {
-        pos[+i + index] += z - this.map.z / 2 + 0.5;
+        pos[+i + index] = posCube[+i] + z - this.map.z / 2 + 0.5;
       }
     }
   }
