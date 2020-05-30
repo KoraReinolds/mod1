@@ -67,10 +67,12 @@
     var isAddingObject = false;
 
     var terrainImages = {
+        'points': 'points',
         'IGMS A': 'images/igms_679104,4595950,680128,4596974_512.jpg',
         'IGMS B': 'images/igms_693432,4598934,694456,4599958_512.jpg'
     };
     var terrainImageSettings = {
+        'points': { 'preblur': 0, 'height': TERRAIN_SIZE, 'midGreyIsLowest': false },
         'images/igms_679104,4595950,680128,4596974_512.jpg': { 'preblur': 3, 'height': 0.3, 'midGreyIsLowest': true },
         'images/igms_693432,4598934,694456,4599958_512.jpg': { 'preblur': 2, 'height': 0.3, 'midGreyIsLowest': true }
     };
@@ -83,6 +85,7 @@
     };
 
     var options = {
+        terrainPoints: [ [10, 10, 10], [10, 5, 5] ],
         terrainImage: terrainImages[Object.keys(terrainImages)[0]],
         terrainMidGreyIsLowest: true,
         terrainPreBlur: terrainImageSettings[Object.keys(terrainImageSettings)[0]].preblur,
@@ -109,7 +112,8 @@
         debugTerrainProxy: false,
         debugSculptTexture: false,
         debugObstaclesTexture: false,
-        debugWaterTexture: false
+        debugWaterTexture: false,
+        heightMapMode: false,
     };
 
     var clock = new THREE.Clock();
@@ -258,9 +262,6 @@
             v[i].z = pixelData[i];
         }
         proxyTerrainGeom.verticesNeedUpdate = true;
-        // proxyTerrainGeom.computeFaceNormals();
-        // proxyTerrainGeom.computeVertexNormals();
-        // proxyTerrainGeom.normalsNeedUpdate = true;
     }
 
     function matchProxyToActualTerrain() {
@@ -326,16 +327,62 @@
 
     var $imageCanvasElem, imageCanvasElemContext;
     var terrainImageData, terrainImageProcessedData;
+    function generateAndSetTerrainPointsHeight() {
+        let points = options.terrainPoints;
+        let maxVal = 0;
+        points = points.map(([x, y, z]) => {
+            const radius = Math.min(x, y, z);
+            let x_max = x + radius;
+            let x_min = x - radius;
+            let z_max = z + radius;
+            let z_min = z - radius;
+            maxVal = Math.max(x_max, y, z_max, maxVal);
+            return { x, y, z, radius, x_max, x_min, z_max, z_min };
+        });
+        points.forEach((point) =>
+            Object.keys(point).forEach((key) => point[key] /= maxVal));
+
+        function smoothstep(min, max, value) {
+            var x = Math.max(0, Math.min(1, (value-min)/(max-min)));
+            return x*x*(3 - 2*x);
+        };
+
+        function getHeight(min, max, value) {
+            return smoothstep(min, (max + min) / 2, value) *
+                smoothstep(max, (max + min) / 2, value);
+        };
+
+        terrainImageData = new Uint8ClampedArray(TERRAIN_RES * TERRAIN_RES * 4);
+        points.forEach(({ y, x_max, x_min, z_max, z_min }) => {
+            for (let z = 0; z <= TERRAIN_RES; ++z) {
+                for (let x = 0; x <= TERRAIN_RES; ++x) {
+                    const yx = getHeight(x_min, x_max, x / TERRAIN_RES);
+                    const yz = getHeight(z_min, z_max, z / TERRAIN_RES);
+                    const height = yx * yz * y / points.length * 255;
+                    const i = (z * TERRAIN_RES + x) * 4;
+                    terrainImageData[i + 0] += height;
+                    terrainImageData[i + 1] += height;
+                    terrainImageData[i + 2] += height;
+                    terrainImageData[i + 3] = 255;
+                }
+            }
+        });
+    }
     function filterTerrainImageAndGenerateHeight() {
-        //draw image onto canvas
-        //NO NEED TO DO THIS WHEN USING stackBlurImage()
-        //imageCanvasElemContext.drawImage($scaledImageObj, 0, 0, terrainImageWidth, terrainImageHeight);
 
-        //do pre-blur filtering first
-        stackBlurImage('scaledTerrainImage', 'terrainImageCanvas', options.terrainPreBlur, false);
-
-        //get filtered image data
-        terrainImageData = imageCanvasElemContext.getImageData(0, 0, TERRAIN_RES, TERRAIN_RES).data;
+        if (options.terrainImage === 'points') {
+            generateAndSetTerrainPointsHeight();
+        } else {
+            //draw image onto canvas
+            //NO NEED TO DO THIS WHEN USING stackBlurImage()
+            //imageCanvasElemContext.drawImage($scaledImageObj, 0, 0, terrainImageWidth, terrainImageHeight);
+    
+            //do pre-blur filtering first
+            stackBlurImage('scaledTerrainImage', 'terrainImageCanvas', options.terrainPreBlur, false);
+    
+            //get filtered image data
+            terrainImageData = imageCanvasElemContext.getImageData(0, 0, TERRAIN_RES, TERRAIN_RES).data;
+        }
 
         //update skulpt
         gpuSkulpt.loadFromImageData(terrainImageData, options.terrainHeight, options.terrainMidGreyIsLowest);
@@ -1033,11 +1080,14 @@
 
             loadTerrainImage(value);
             options.terrainImage = value;
-
+            
             //load some presets so that the loaded terrain looks nicer
             options.terrainPreBlur = terrainImageSettings[value].preblur;
             options.terrainHeight = terrainImageSettings[value].height;
             options.terrainMidGreyIsLowest = terrainImageSettings[value].midGreyIsLowest;
+            if (value === 'points') {
+                filterTerrainImageAndGenerateHeight(value);
+            }
 
             //update display
             var i, len;
@@ -1056,13 +1106,15 @@
 
         terrainPreBlurControl = terrainFolder.add(options, 'terrainPreBlur', 0, 10).name('Pre-Blur').listen();
         changeTerrainPreBlur = function (value) {
-            value = THREE.Math.clamp(value, terrainPreBlurControl.__min, terrainPreBlurControl.__max);
-            filterTerrainImageAndGenerateHeight(value);
-            options.terrainPreBlur = value;
+            if (options.terrainImage !== 'points') {
+                value = THREE.Math.clamp(value, terrainPreBlurControl.__min, terrainPreBlurControl.__max);
+                filterTerrainImageAndGenerateHeight(value);
+                options.terrainPreBlur = value;
+            }
         };
         terrainPreBlurControl.onChange(changeTerrainPreBlur);
 
-        terrainHeightControl = terrainFolder.add(options, 'terrainHeight', 0, 4).name('Height').listen();
+        terrainHeightControl = terrainFolder.add(options, 'terrainHeight', 0, TERRAIN_SIZE).name('Height').listen();
         changeTerrainHeight = function (value) {
             value = THREE.Math.clamp(value, terrainHeightControl.__min, terrainHeightControl.__max);
             gpuSkulpt.loadFromImageData(terrainImageData, options.terrainHeight, options.terrainMidGreyIsLowest);
@@ -1234,18 +1286,19 @@
         //setup terrain image
         prepareTerrainImageElements();
         loadTerrainImage(options.terrainImage);
-
+        
         //setup water
         setupWater();
-
+        
         //setup events
         setupEvents();
-
+        
         //setup stats monitor
         setupStats();
-
+        
         //setup GUI
         setupGui();
+        changeTerrainImage('points');
 
         //start Physijs sim
         scene.simulate();
