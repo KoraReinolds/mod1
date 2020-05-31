@@ -1,0 +1,14 @@
+* {
+  margin: 0;
+}
+
+.loader {
+  height: 300px;
+  width: 300px;
+  background: green;
+}
+
+.mark {
+  background: red;
+}
+/*# sourceMappingURL=style.css.map */
