@@ -86,6 +86,8 @@
 
     var options = {
         terrainPoints: [ [10, 10, 10], [10, 5, 5] ],
+        waveHeight: 0.0,
+        waveActive: false,
         terrainImage: terrainImages[Object.keys(terrainImages)[0]],
         terrainMidGreyIsLowest: true,
         terrainPreBlur: terrainImageSettings[Object.keys(terrainImageSettings)[0]].preblur,
@@ -168,7 +170,7 @@
 
         //create camera
         camera = new THREE.PerspectiveCamera(25, renderer.domElement.width / renderer.domElement.height, 0.1, 1000);
-        camera.position.set(4, 4, 7);
+        camera.position.set(15, 15, 15);
         camera.lookAt(new THREE.Vector3(0, 0, 0));
 
         //create controls for camera
@@ -510,6 +512,7 @@
 
         //get intersection point
         if (intersectInfo && intersectInfo[0]) {
+            console.log(intersectInfo[0].point)
             return intersectInfo[0].point;
         }
 
@@ -1063,13 +1066,24 @@
     }
 
     var gui;
-    var terrainFolder, sculptFolder, waterFolder, objectsFolder, renderingFolder, debugFolder;
+    var waveFolder, terrainFolder, sculptFolder, waterFolder, objectsFolder, renderingFolder, debugFolder;
     function setupGui() {
 
         gui = new dat.GUI({width: 300});
         // gui.close();  //close GUI by default
 
         var control;
+
+        //Wave folder
+        waveFolder = gui.addFolder('Wave');
+        waveFolder.open();
+        control = waveFolder.add(options, 'waveActive').name('Wave').listen();
+        waveHeightControl = waveFolder.add(options, 'waveHeight', 0, 3.0).name('WaveHeight').listen();
+        changeWaveHeight = function (value) {
+            options.waveHeight = value;
+            gpuWater.__disturbAndSourceMaterial.uniforms["uWaveHeight"].value = value;
+        };
+        waveHeightControl.onChange(changeWaveHeight);
 
         //Terrain folder
         terrainFolder = gui.addFolder('Terrain');
@@ -1309,6 +1323,9 @@
             var dt = clock.getDelta();  //have to call this before getElapsedTime()
             var time = clock.getElapsedTime();
 
+            if (options.waveActive) {
+                gpuWater.disturb(new THREE.Vector3(0.5, 0.0, 0.5), WATER_DISTURB_AMOUNT, WATER_DISTURB_RADIUS);
+            }
             //update and render
             renderer.autoClear = false;
             renderer.clear();

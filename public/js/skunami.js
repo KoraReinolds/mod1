@@ -361,6 +361,9 @@ SKUNAMI.GpuHeightFieldWater.prototype.__shaders = {
 
         hfWater_disturb: [
 
+            //Wave height
+            "uniform float uWaveHeight;",
+            
             //Fragment shader for disturbing water simulations
 
             "uniform sampler2D uTexture;",
@@ -423,7 +426,12 @@ SKUNAMI.GpuHeightFieldWater.prototype.__shaders = {
                 "if (uIsFlooding == 1) {",  //this is used for pipe model water only
                     "t.r += uFloodAmount;",
                 "}",
-
+                
+                "if (vUv.x < 0.1) {",  //this is used for pipe model water only
+                    "t.r = uWaveHeight;",
+                "}",
+                // "t.r = 2.0;",
+                
                 //write out to texture for next step
                 "gl_FragColor = t;",
             "}"
@@ -1270,7 +1278,8 @@ SKUNAMI.GpuHeightFieldWater.prototype.__setupShaders = function () {
             uSourceAmount: { type: 'f', value: this.__sourceAmount },
             uSourceRadius: { type: 'f', value: this.__sourceRadius },
             uIsFlooding: { type: 'i', value: 0 },  //for pipe model water only
-            uFloodAmount: { type: 'f', value: 0 }  //for pipe model water only
+            uFloodAmount: { type: 'f', value: 0 },  //for pipe model water only
+            uWaveHeight: { type: 'f', value: 0 }
         },
         vertexShader: this.__shaders.vert['passUv'],
         fragmentShader: this.__shaders.frag['hfWater_disturb']
@@ -1618,6 +1627,7 @@ SKUNAMI.GpuHeightFieldWater.prototype.flood = function (volume) {
 };
 SKUNAMI.GpuHeightFieldWater.prototype.__disturbPass = function () {
     var shouldRender = false;
+    debugger;
     if (this.__disturbMapHasUpdated) {
         // this.__disturbAndSourceMaterial.uniforms['uStaticObstaclesTexture'].value = this.__rttDynObstaclesRenderTarget;
         this.__disturbAndSourceMaterial.uniforms['uDisturbTexture'].value = this.__rttDisturbMapRenderTarget;
@@ -1671,7 +1681,7 @@ SKUNAMI.GpuHeightFieldWater.prototype.__calculateSubsteps = function (dt) {
  * @param  {number} dt Elapsed time since previous frame
  */
 SKUNAMI.GpuHeightFieldWater.prototype.update = function (dt) {
-
+    
     //NOTE: unable to figure out why cannot clear until a few updates later,
     //so using this dirty hack to init for a few frames
     if (this.__initCounter > 0) {
