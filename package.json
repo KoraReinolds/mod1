@@ -5,7 +5,8 @@
   "main": "server.js",
   "dependencies": {
     "express": "^4.17.1",
-    "simplex-noise": "^2.4.0"
+    "simplex-noise": "^2.4.0",
+    "three": "^0.117.1"
   },
   "devDependencies": {
     "jpeg-js": "^0.4.0"

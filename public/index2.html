@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>skunami.js - Two-Way Coupling</title>
+    <meta charset="UTF-8"/>
+
+    <link href='http://fonts.googleapis.com/css?family=Fauna+One' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="css/style.css">
+    <script type="module">
+        import { OrbitControls } from "./jsm/controls/OrbitControls.js";
+        import ImageLoader from "./ImageLoader.js";
+        import SKULPT from "./js/skulpt/skulpt.js";
+        import * as THREE from "../../../build/three.module.js";
+
+        const TERRAIN_RES = 256;
+        const TERRAIN_SIZE = 6;
+        const PROXY_TERRAIN_RES = 64;
+        let terrainImageSettings = {
+            'images/igms_679104,4595950,680128,4596974_512.jpg': { 'preblur': 3, 'height': 0.3, 'midGreyIsLowest': true },
+            'points': { 'preblur': 0, 'height': TERRAIN_SIZE, 'midGreyIsLowest': false },
+            'images/igms_693432,4598934,694456,4599958_512.jpg': { 'preblur': 2, 'height': 0.3, 'midGreyIsLowest': true }
+        };
+        let options = {
+            terrainPoints: [ [10, 10, 10], [10, 5, 5] ],
+            terrainImage: Object.keys(terrainImageSettings)[0],
+            terrainMidGreyIsLowest: true,
+            terrainPreBlur: terrainImageSettings[Object.keys(terrainImageSettings)[0]].preblur,
+            terrainHeight: terrainImageSettings[Object.keys(terrainImageSettings)[0]].height,
+        };
+        let terrainGeom, terrainMesh;
+        let renderer, scene, camera, gpuSkulpt, controls;
+        let clock = new THREE.Clock();
+        scene = new THREE.Scene();
+        let imageLoader = new ImageLoader({ width: TERRAIN_RES, height: TERRAIN_RES, src: options.terrainImage })
+
+        function initRenderer() {
+            renderer = new THREE.WebGLRenderer({
+                antialias : true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight - 5);
+            renderer.setClearColor('#089119', 1);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFShadowMap;
+            renderer.shadowMapSoft = true;
+            renderer.domElement.id = 'threejs-canvas';
+            document.getElementById('threejs-container').append(renderer.domElement);
+        }
+
+        function initCamera() {
+            camera = new THREE.PerspectiveCamera(25, renderer.domElement.width / renderer.domElement.height, 0.1, 1000);
+            camera.position.set(15, 15, 15);
+            camera.lookAt(new THREE.Vector3(0, 0, 0));
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+
+        let origImageObj;
+        let imageCanvasElemContext;
+
+        function filterTerrainImageAndGenerateHeight(data) {
+            gpuSkulpt.loadFromImageData(data, options.terrainHeight, options.terrainMidGreyIsLowest);
+        }
+
+        function loop() {
+            var dt = clock.getDelta();  //have to call this before getElapsedTime()
+            // var time = clock.getElapsedTime();
+
+            // if (options.waveActive) {
+            //     gpuWater.disturb(new THREE.Vector3(0.5, 0.0, 0.5), WATER_DISTURB_AMOUNT, WATER_DISTURB_RADIUS);
+            // }
+            // //update and render
+            renderer.autoClear = false;
+            renderer.clear();
+            gpuSkulpt.update(dt);
+            // gpuWater.update(dt);
+            renderer.render(scene, camera);
+
+            // controls.update();
+            // renderStats.update();
+
+            // //change water height based on flood levels
+            // dWaterVol = options.waterFloodVolRate * dt;
+            // gpuWater.flood(dWaterVol);
+
+            requestAnimationFrame(loop);
+        }
+        
+        initRenderer()
+        initCamera()
+        // prepareTerrainImageElements();
+
+        //create a terrain mesh for sculpting
+        terrainGeom = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_RES - 1, TERRAIN_RES - 1);
+        terrainGeom.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+        var groundPlaneMaterial = new THREE.MeshBasicMaterial({
+            color: 0x99f166
+        });
+        terrainMesh = new THREE.Mesh(terrainGeom, null);
+        // terrainMesh.material = groundPlaneMaterial;
+        // terrainMesh = new THREE.Mesh(terrainGeom, groundPlaneMaterial);
+        
+        // terrainMesh.visible = false;
+        
+        gpuSkulpt = new SKULPT({
+            renderer: renderer,
+            mesh: terrainMesh,
+            size: TERRAIN_SIZE,
+            res: TERRAIN_RES,
+            proxyRes: PROXY_TERRAIN_RES
+        });
+
+        terrainMesh.castShadow = true;
+        terrainMesh.receiveShadow = true;
+        scene.add(terrainMesh);
+
+        imageLoader.load(options.terrainImage).then((data) => {
+            filterTerrainImageAndGenerateHeight(data);
+        });
+
+        loop();
+
+
+    </script>
+</head>
+<body>
+    <div id="threejs-container"></div>
+    <div class="translucent" id="info-container">
+        <div>Camera: [ Alt+LMB: rotate ] [ Alt+MMB: pan ] [ Alt+RMB: zoom ]</div>
+        <div>Sculpt: [ Ctrl+LMB: add ] [ Ctrl+RMB: remove ]</div>
+        <div>Water: [ Space+LMB: source ] [ Space+MMB: disturb ] [ Space+RMB: sink ]</div>
+        <div>Adding Objects: [ Hold R + Move Mouse: rotate ]</div>
+        <div>First Dyn Object: [ W, A, S, D: push ]</div>
+    </div>
+</body>
+</html>
