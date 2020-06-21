@@ -7,6 +7,7 @@ const REMOVE = 2;
 export default class GpuSkulpt {
   constructor({ mesh, renderer, size, res, proxyRes }) {
 
+    // this.__imageTexture = texture;
     this.__mesh = mesh;
     this.__renderer = renderer;
     this.__size = size || 6;
@@ -166,6 +167,7 @@ export default class GpuSkulpt {
         THREE.UniformsLib[ 'ambient' ],
         THREE.UniformsLib['shadowmap'],
         {
+          uImageTexture: { type: 't', value: null },
           uTexture: { type: 't', value: null },
           uTexelSize: { type: 'v2', value: new THREE.Vector2(1.0 / this.__res, 1.0 / this.__res) },
           uTexelWorldSize: { type: 'v2', value: new THREE.Vector2(this.__gridSize, this.__gridSize) },
@@ -306,6 +308,11 @@ export default class GpuSkulpt {
         this.__mesh.material.uniforms['uCursorColor'].value.copy(this.__cursorRemoveColor);
     }
   }
+
+  setTexture(texture) {
+    console.log(texture)
+    this.__mesh.material.uniforms['uImageTexture'].value = texture;
+  };
 
   static get ADD() {
     return ADD;

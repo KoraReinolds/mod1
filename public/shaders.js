@@ -206,6 +206,7 @@ export default {
       //Fragment shader that does basic lambert shading.
       //This is the version that overlays a circular cursor patch.
 
+      "uniform sampler2D uImageTexture;",
       "uniform vec3 uBaseColor;",
       "uniform vec3 uAmbientLightColor;",
       "uniform float uAmbientLightIntensity;",
@@ -232,7 +233,7 @@ export default {
         "vec4 lightVector = viewMatrix * vec4(vec3(1.0, 0.5, 0.275), 0.0);",
         "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
         "diffuse += normalModulator * vec3(1.0, 1.0, 1.0);",
-        "vec3 finalColor = uBaseColor * (ambient + diffuse);",
+        "vec3 finalColor = texture2D(uImageTexture, vUv).xyz * (ambient + diffuse);",
 
         //mix in cursor color
         "if (uShowCursor == 1) {",

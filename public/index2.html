@@ -15,6 +15,7 @@
         const TERRAIN_RES = 256;
         const TERRAIN_SIZE = 6;
         const PROXY_TERRAIN_RES = 64;
+        let terrainTexture;
         let terrainImageSettings = {
             'images/igms_679104,4595950,680128,4596974_512.jpg': { 'preblur': 3, 'height': 0.3, 'midGreyIsLowest': true },
             'points': { 'preblur': 0, 'height': TERRAIN_SIZE, 'midGreyIsLowest': false },
@@ -61,13 +62,16 @@
             terrainGeom = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_RES - 1, TERRAIN_RES - 1);
             terrainGeom.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
             terrainMesh = new THREE.Mesh(terrainGeom, null);
-            
             gpuSkulpt = new SKULPT({
                 renderer: renderer,
                 mesh: terrainMesh,
                 size: TERRAIN_SIZE,
                 res: TERRAIN_RES,
-                proxyRes: PROXY_TERRAIN_RES
+                proxyRes: PROXY_TERRAIN_RES,
+                // texture: terrainTexture,
+            });
+            new THREE.TextureLoader().load( './textures/SandBig.jpg', function ( texture ) {
+                gpuSkulpt.setTexture(texture);
             });
             
             terrainMesh.castShadow = true;
@@ -224,7 +228,6 @@
             }
 
             function window_onKeyUp(event) {
-                console.log(event.keyCode)
                 if (event.keyCode === 18) { //alt or option(mac)
                     gpuSkulpt.hideCursor(); //for sculpting
                 }
