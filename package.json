@@ -1,20 +1,33 @@
 {
   "name": "mod-1",
   "version": "1.0.0",
-  "description": "",
+  "description": "Three.js graphic project. A graphic representation of the surface, and graphic representation of the water and its movements.",
   "main": "server.js",
   "dependencies": {
     "express": "^4.17.1",
     "simplex-noise": "^2.4.0",
+    "stackblur-canvas": "^2.3.0",
     "three": "^0.117.1"
   },
   "devDependencies": {
-    "jpeg-js": "^0.4.0"
+    "@babel/core": "^7.10.3",
+    "@babel/preset-env": "^7.10.3",
+    "babel-loader": "^8.1.0",
+    "jpeg-js": "^0.4.0",
+    "webpack": "^4.43.0"
   },
   "scripts": {
     "postinstall": "npm install express",
     "start": "node server.js"
   },
   "author": "mskiles",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KoraReinolds/mod1.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KoraReinolds/mod1/issues"
+  },
+  "homepage": "https://github.com/KoraReinolds/mod1#readme"
 }

@@ -7,7 +7,6 @@ const REMOVE = 2;
 export default class GpuSkulpt {
   constructor({ mesh, renderer, size, res, proxyRes }) {
 
-    // this.__imageTexture = texture;
     this.__mesh = mesh;
     this.__renderer = renderer;
     this.__size = size || 6;
@@ -185,17 +184,13 @@ export default class GpuSkulpt {
     });
   }
   
-  loadFromImageData(data, amount, midGreyIsLowest) {
+  loadFromImageData(data, amount) {
     //convert data from Uint8ClampedArray to Float32Array so that DataTexture can use
     let normalizedHeight;
     let min = 99999;
     let i, len;
     for (i = 0, len = this.__imageProcessedData.length; i < len; i++) {
-      if (midGreyIsLowest) {
-        normalizedHeight = Math.abs(data[i] / 255.0 - 0.5);
-      } else {
-        normalizedHeight = data[i] / 255.0;
-      }
+      normalizedHeight = data[i] / 255.0;
       this.__imageProcessedData[i] = normalizedHeight * amount;
 
       //store min
