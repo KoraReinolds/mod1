@@ -28,7 +28,7 @@
     <script type="text/javascript" src="js/physijs/physi.js"></script>
 
     <!--load water libraries-->
-    <script type="text/javascript" src="js/skunami.js"></script>
+    <script type="text/javascript" src="js/skunami copy.js"></script>
 
     <!--load skarf (using its model loading functionalities only)-->
     <script type="text/javascript" src="js/skarf/skarf.min.js"></script>
@@ -446,7 +446,6 @@
         waterMesh = new THREE.Mesh(waterGeom, null);
         waterMesh.castShadow = true;
         waterMesh.receiveShadow = true;
-        // waterMesh.visible = false;
         scene.add(waterMesh);
 
         //create a pipe model water as the height field water sim
@@ -512,7 +511,6 @@
 
         //get intersection point
         if (intersectInfo && intersectInfo[0]) {
-            console.log(intersectInfo[0].point)
             return intersectInfo[0].point;
         }
 
@@ -849,7 +847,7 @@
     var activateAddRotate = false;
     var firstActivateAddRotate = false;
     function window_onKeyDown(event) {
-
+        
         //for water
         if (event.keyCode === 32) {  //space
             activateDisturb = true;

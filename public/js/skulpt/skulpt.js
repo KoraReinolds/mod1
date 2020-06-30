@@ -13,7 +13,6 @@ export default class GpuSkulpt {
     this.__halfSize = this.__size / 2.0;
     this.__res = res || 256;
     this.__proxyRes = proxyRes || 64 || this.__res;
-    this.__actualToProxyRatio = this.__res / this.__proxyRes;
     this.__gridSize = this.__size / this.__res;
     this.__texelSize = 1.0 / this.__res;
     this.__imageProcessedData = new Float32Array(4 * this.__res * this.__res);
@@ -48,11 +47,6 @@ export default class GpuSkulpt {
       type: THREE.FloatType
     };
 
-    this.__pixelByteData = new Uint8Array(this.__res * this.__res * 4);
-    this.__proxyPixelByteData = new Uint8Array(this.__proxyRes * this.__proxyRes * 4);
-
-    this.__callbacks = {};
-
     this.__setupRttScene();
 
     //setup a reset material for clearing render targets
@@ -77,22 +71,20 @@ export default class GpuSkulpt {
       this.__imageDataTexture = new THREE.DataTexture(null, this.__res, this.__res, THREE.RGBAFormat, THREE.FloatType, undefined, THREE.ClampToEdgeWrapping, THREE.ClampToEdgeWrapping, THREE.NearestFilter, THREE.NearestFilter);
       this.__imageDataTexture.generateMipmaps = false;
     }
-  }
+  };
 
   __setupRttScene() {
     //create a RTT scene
     this.__rttScene = new THREE.Scene();
-    
     //create an orthographic RTT camera
-    var far = 10000;
-    var near = -far;
+    let far = 10000;
+    let near = -far;
     this.__rttCamera = new THREE.OrthographicCamera(-this.__halfSize, this.__halfSize, this.__halfSize, -this.__halfSize, near, far);
-    
     //create a quad which we will use to invoke the shaders
     this.__rttQuadGeom = new THREE.PlaneGeometry(this.__size, this.__size);
     this.__rttQuadMesh = new THREE.Mesh(this.__rttQuadGeom, this.__skulptMaterial);
     this.__rttScene.add(this.__rttQuadMesh);
-  }
+  };
     
   __setupRttRenderTargets() {
     //create RTT render targets (we need two to do feedback)
@@ -104,7 +96,7 @@ export default class GpuSkulpt {
     this.__rttProxyRenderTarget = new THREE.WebGLRenderTarget(this.__proxyRes, this.__proxyRes, this.__floatRgbParams);
     //create another RTT render target encoding float to 4-byte data
     this.__rttFloatEncoderRenderTarget = new THREE.WebGLRenderTarget(this.__res, this.__res, this.__nearestFloatRgbaParams);
-  }
+  };
 
   __setupShaders() {
     
@@ -115,7 +107,6 @@ export default class GpuSkulpt {
         uTexelSize: { type: 'v2', value: new THREE.Vector2(this.__texelSize, this.__texelSize) },
         uTexelWorldSize: { type: 'v2', value: new THREE.Vector2(this.__size / this.__res, this.__size / this.__res) },
         uIsSculpting: { type: 'i', value: 0 },
-        uSculptType: { type: 'i', value: 0 },
         uSculptPos: { type: 'v2', value: new THREE.Vector2() },
         uSculptAmount: { type: 'f', value: 0.05 },
         uSculptRadius: { type: 'f', value: 0.1 }
@@ -132,57 +123,27 @@ export default class GpuSkulpt {
       vertexShader: Shaders.vert['passUv'],
       fragmentShader: Shaders.frag['combineTextures']
     });
-    
-    this.__rttEncodeFloatMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        uTexture: { type: 't', value: null },
-        uChannelMask: { type: 'v4', value: new THREE.Vector4() }
-      },
-      vertexShader: Shaders.vert['passUv'],
-      fragmentShader: Shaders.frag['encodeFloat']
-    });
-    
-    this.__rttProxyMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        uTexture: { type: 't', value: null },
-        uScale: { type: 'f', value: 0 }
-      },
-      vertexShader: Shaders.vert['passUv'],
-      fragmentShader: Shaders.frag['scaleAndFlipV']
-    });
-    
-    this.__channelVectors = {
-      'r': new THREE.Vector4(1, 0, 0, 0),
-      'g': new THREE.Vector4(0, 1, 0, 0),
-      'b': new THREE.Vector4(0, 0, 1, 0),
-      'a': new THREE.Vector4(0, 0, 0, 1)
-    };
+
   };
   
   __setupVtf() {
     this.__mesh.material = new THREE.ShaderMaterial({
-      uniforms: THREE.UniformsUtils.merge([
-        THREE.UniformsLib['lights'],
-        THREE.UniformsLib[ 'ambient' ],
-        THREE.UniformsLib['shadowmap'],
-        {
-          uImageTexture: { type: 't', value: null },
-          uTexture: { type: 't', value: null },
-          uTexelSize: { type: 'v2', value: new THREE.Vector2(1.0 / this.__res, 1.0 / this.__res) },
-          uTexelWorldSize: { type: 'v2', value: new THREE.Vector2(this.__gridSize, this.__gridSize) },
-          uHeightMultiplier: { type: 'f', value: 1.0 },
-          uBaseColor: { type: 'v3', value: new THREE.Vector3(0.6, 0.8, 0.0) },
-          uShowCursor: { type: 'i', value: 0 },
-          uCursorPos: { type: 'v2', value: new THREE.Vector2() },
-          uCursorRadius: { type: 'f', value: 0.1 },
-          uCursorColor: { type: 'v3', value: new THREE.Vector3() }
-        }
-      ]),
+      uniforms: {
+        uImageTexture: { type: 't', value: null },
+        uTexture: { type: 't', value: null },
+        uTexelSize: { type: 'v2', value: new THREE.Vector2(1.0 / this.__res, 1.0 / this.__res) },
+        uTexelWorldSize: { type: 'v2', value: new THREE.Vector2(this.__gridSize, this.__gridSize) },
+        uHeightMultiplier: { type: 'f', value: 1.0 },
+        uBaseColor: { type: 'v3', value: new THREE.Vector3(0.6, 0.8, 0.0) },
+        uShowCursor: { type: 'i', value: 0 },
+        uCursorPos: { type: 'v2', value: new THREE.Vector2() },
+        uCursorRadius: { type: 'f', value: 0.1 },
+        uCursorColor: { type: 'v3', value: new THREE.Vector3() }
+      },
       vertexShader: Shaders.vert['heightMap'],
       fragmentShader: Shaders.frag['lambertCursor'],
-      lights: true
     });
-  }
+  };
   
   loadFromImageData(data, amount) {
     //convert data from Uint8ClampedArray to Float32Array so that DataTexture can use
@@ -192,25 +153,22 @@ export default class GpuSkulpt {
     for (i = 0, len = this.__imageProcessedData.length; i < len; i++) {
       normalizedHeight = data[i] / 255.0;
       this.__imageProcessedData[i] = normalizedHeight * amount;
-
       //store min
       if (this.__imageProcessedData[i] < min) {
         min = this.__imageProcessedData[i];
       }
     }
-
     //shift down so that min is at 0
     for (i = 0, len = this.__imageProcessedData.length; i < len; i++) {
       this.__imageProcessedData[i] -= min;
     }
-
     //assign data to DataTexture
     this.__imageDataTexture.image.data = this.__imageProcessedData;
     this.__imageDataTexture.needsUpdate = true;
     this.__skulptMaterial.uniforms['uBaseTexture'].value = this.__imageDataTexture;
     this.__combineTexturesMaterial.uniforms['uTexture1'].value = this.__imageDataTexture;
     this.__updateCombinedLayers = true;
-  }
+  };
 
   __setShaderAndRender(shader, renderTarget) {
     this.__rttQuadMesh.material = shader;
@@ -218,31 +176,26 @@ export default class GpuSkulpt {
     this.__renderer.clear();
     this.__renderer.render(this.__rttScene, this.__rttCamera);
     this.__renderer.setRenderTarget(null);
-  }
+  };
 
   update() {
-
     //have to set flags from other places and then do all steps at once during update
     //clear sculpts if necessary
     if (this.__shouldClear) {
-    
-      this.__rttQuadMesh.material = this.__clearMaterial;
       this.__clearMaterial.uniforms['uColor'].value.set(0.0, 0.0, 0.0, 0.0);
-      this.__renderer.render(this.__rttScene, this.__rttCamera, this.__rttRenderTarget1, false);
-      this.__renderer.render(this.__rttScene, this.__rttCamera, this.__rttRenderTarget2, false);
+      this.__setShaderAndRender(this.__clearMaterial, this.__rttRenderTarget1);
+      this.__setShaderAndRender(this.__clearMaterial, this.__rttRenderTarget2);
       this.__shouldClear = false;
       this.__updateCombinedLayers = true;
     }
 
-    //do the main sculpting
+    //do the main sculptings
     if (this.__isSculpting) {
       this.__skulptMaterial.uniforms['uBaseTexture'].value = this.__imageDataTexture;
       this.__skulptMaterial.uniforms['uSculptTexture1'].value = this.__rttRenderTarget2.texture;
       this.__skulptMaterial.uniforms['uIsSculpting'].value = this.__isSculpting;
       this.__skulptMaterial.uniforms['uSculptPos'].value.copy(this.__sculptUvPos);
-
-      this.__setShaderAndRender(this.__skulptMaterial, this.__rttRenderTarget1)
-      
+      this.__setShaderAndRender(this.__skulptMaterial, this.__rttRenderTarget1);
       this.__swapRenderTargets();
       this.__isSculpting = false;
       this.__updateCombinedLayers = true;
@@ -252,30 +205,18 @@ export default class GpuSkulpt {
     if (this.__updateCombinedLayers) {  //this can be triggered somewhere else without sculpting
       this.__combineTexturesMaterial.uniforms['uTexture1'].value = this.__imageDataTexture;
       this.__combineTexturesMaterial.uniforms['uTexture2'].value = this.__rttRenderTarget2.texture;
-      
       this.__setShaderAndRender(this.__combineTexturesMaterial, this.__rttCombinedLayer)
-
       this.__updateCombinedLayers = false;
-
       //need to rebind rttCombinedLayer to uTexture
       this.__mesh.material.uniforms['uTexture'].value = this.__rttCombinedLayer.texture;
-
-      //check for the callback of type 'update'
-      if (this.__callbacks.hasOwnProperty('update')) {
-        var renderCallbacks = this.__callbacks['update'];
-        var i, len;
-        for (i = 0, len = renderCallbacks.length; i < len; i++) {
-          renderCallbacks[i]();
-        }
-      }
     }
-  }
+  };
   
   __swapRenderTargets() {
-    var temp = this.__rttRenderTarget1;
+    let temp = this.__rttRenderTarget1;
     this.__rttRenderTarget1 = this.__rttRenderTarget2;
     this.__rttRenderTarget2 = temp;
-  }
+  };
 
   showCursor() {
     this.__mesh.material.uniforms['uShowCursor'].value = 1;
@@ -293,7 +234,6 @@ export default class GpuSkulpt {
   };
   
   sculpt(type, position) {
-    this.__skulptMaterial.uniforms['uSculptType'].value = type;
     this.__isSculpting = true;
     this.__sculptUvPos.x = (position.x + this.__halfSize) / this.__size;
     this.__sculptUvPos.y = (position.z + this.__halfSize) / this.__size;
@@ -302,11 +242,28 @@ export default class GpuSkulpt {
     } else if (type === 2) {
         this.__mesh.material.uniforms['uCursorColor'].value.copy(this.__cursorRemoveColor);
     }
-  }
+  };
 
   setTexture(texture) {
-    console.log(texture)
     this.__mesh.material.uniforms['uImageTexture'].value = texture;
+  };
+
+  getSculptDisplayTexture() {
+    return this.__rttCombinedLayer.texture;
+  };
+
+  clear() {
+    this.__shouldClear = true;
+  };
+  
+  setBrushSize(size) {
+    let normSize = size / (this.__size * 2.0);
+    this.__skulptMaterial.uniforms['uSculptRadius'].value = normSize;
+    this.__mesh.material.uniforms['uCursorRadius'].value = normSize;
+  };
+  
+  setBrushAmount(amount) {
+    this.__skulptMaterial.uniforms['uSculptAmount'].value = amount;
   };
 
   static get ADD() {

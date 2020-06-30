@@ -13,6 +13,58 @@ export default {
       "}"
     ].join('\n'),
 
+    heightMapWater: [
+
+      //Vertex shader that displaces vertices in local Y based on a texture
+
+      "uniform sampler2D uTexture;",
+      "uniform vec2 uTexelSize;",
+      "uniform vec2 uTexelWorldSize;",
+      "uniform float uHeightMultiplier;",
+
+      "varying vec3 vViewPos;",
+      "varying vec3 vViewNormal;",
+      "varying vec2 vUv;",
+
+      // THREE.ShaderChunk['shadowmap_pars_vertex'],
+
+      "void main() {",
+
+          "vUv = uv;",
+
+          //displace y based on texel value
+          "vec4 t = texture2D(uTexture, vUv) * uHeightMultiplier;",
+          "vec3 displacedPos = vec3(position.x, t.r, position.z);",
+
+          //find normal
+          "vec2 du = vec2(uTexelSize.r, 0.0);",
+          "vec2 dv = vec2(0.0, uTexelSize.g);",
+          "vec3 vecPosU = vec3(displacedPos.x + uTexelWorldSize.r,",
+                              "texture2D(uTexture, vUv + du).r * uHeightMultiplier,",
+                              "displacedPos.z) - displacedPos;",
+          "vec3 vecNegU = vec3(displacedPos.x - uTexelWorldSize.r,",
+                              "texture2D(uTexture, vUv - du).r * uHeightMultiplier,",
+                              "displacedPos.z) - displacedPos;",
+          "vec3 vecPosV = vec3(displacedPos.x,",
+                              "texture2D(uTexture, vUv + dv).r * uHeightMultiplier,",
+                              "displacedPos.z - uTexelWorldSize.g) - displacedPos;",
+          "vec3 vecNegV = vec3(displacedPos.x,",
+                              "texture2D(uTexture, vUv - dv).r * uHeightMultiplier,",
+                              "displacedPos.z + uTexelWorldSize.g) - displacedPos;",
+          "vViewNormal = normalize(normalMatrix * 0.25 * (cross(vecPosU, vecPosV) + cross(vecPosV, vecNegU) + cross(vecNegU, vecNegV) + cross(vecNegV, vecPosU)));",
+
+          "vec4 worldPosition = modelMatrix * vec4(displacedPos, 1.0);",
+          "vec4 viewPos = modelViewMatrix * vec4(displacedPos, 1.0);",
+          "vViewPos = viewPos.rgb;",
+
+          "gl_Position = projectionMatrix * viewPos;",
+
+          // THREE.ShaderChunk['shadowmap_vertex'],
+
+      "}"
+
+    ].join('\n'),
+
     heightMap: [
       //Vertex shader that displaces vertices in local Y based on a texture
 
@@ -83,7 +135,6 @@ export default {
       "uniform sampler2D uSculptTexture1;",
       "uniform vec2 uTexelSize;",
       "uniform int uIsSculpting;",
-      "uniform int uSculptType;",
       "uniform float uSculptAmount;",
       "uniform float uSculptRadius;",
       "uniform vec2 uSculptPos;",
@@ -103,12 +154,8 @@ export default {
         "vec4 t1 = texture2D(uSculptTexture1, vUv);",
         //add sculpt
         "if (uIsSculpting == 1) {",
-          "if (uSculptType == 1) {",  //add
-            "t1.r += add(vUv);",
-          "} else if (uSculptType == 2) {",  //remove
-            "t1.r -= add(vUv);",
-            "t1.r = max(0.0, tBase.r + t1.r) - tBase.r;",
-          "}",
+          "t1.r += add(vUv);",
+          "t1.r = max(0.0, tBase.r + t1.r) - tBase.r;",
         "}",
         //write out to texture for next step
         "gl_FragColor = t1;",
@@ -127,78 +174,41 @@ export default {
       "}"
     ].join('\n'),
 
-    encodeFloat: [
-      //Fragment shader that encodes float value in input R channel to 4 unsigned bytes in output RGBA channels
-      //Most of this code is from original GLSL codes from Piotr Janik, only slight modifications are done to fit the needs of this script
-      //http://concord-consortium.github.io/lab/experiments/webgl-gpgpu/script.js
-      //Using method 1 of the code.
+    lambert: [
 
-      "uniform sampler2D uTexture;",
-      "uniform vec4 uChannelMask;",
+      "uniform vec3 uBaseColor;",
+      "uniform vec3 uAmbientLightColor;",
+      "uniform float uAmbientLightIntensity;",
 
+      "varying vec3 vViewPos;",
+      "varying vec3 vViewNormal;",
       "varying vec2 vUv;",
 
-      "float shift_right(float v, float amt) {",
-        "v = floor(v) + 0.5;",
-        "return floor(v / exp2(amt));",
-      "}",
-
-      "float shift_left(float v, float amt) {",
-        "return floor(v * exp2(amt) + 0.5);",
-      "}",
-
-      "float mask_last(float v, float bits) {",
-        "return mod(v, shift_left(1.0, bits));",
-      "}",
-
-      "float extract_bits(float num, float from, float to) {",
-        "from = floor(from + 0.5);",
-        "to = floor(to + 0.5);",
-        "return mask_last(shift_right(num, from), to - from);",
-      "}",
-
-      "vec4 encode_float(float val) {",
-
-        "if (val == 0.0) {",
-          "return vec4(0, 0, 0, 0);",
-        "}",
-
-        "float sign = val > 0.0 ? 0.0 : 1.0;",
-        "val = abs(val);",
-        "float exponent = floor(log2(val));",
-        "float biased_exponent = exponent + 127.0;",
-        "float fraction = ((val / exp2(exponent)) - 1.0) * 8388608.0;",
-
-        "float t = biased_exponent / 2.0;",
-        "float last_bit_of_biased_exponent = fract(t) * 2.0;",
-        "float remaining_bits_of_biased_exponent = floor(t);",
-
-        "float byte4 = extract_bits(fraction, 0.0, 8.0) / 255.0;",
-        "float byte3 = extract_bits(fraction, 8.0, 16.0) / 255.0;",
-        "float byte2 = (last_bit_of_biased_exponent * 128.0 + extract_bits(fraction, 16.0, 23.0)) / 255.0;",
-        "float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;",
-
-        "return vec4(byte4, byte3, byte2, byte1);",
-      "}",
+      // THREE.ShaderChunk['shadowmap_pars_fragment'],
 
       "void main() {",
-        "vec4 t = texture2D(uTexture, vUv);",
-        "gl_FragColor = encode_float(dot(t, uChannelMask));",
+
+          //ambient component
+          "vec3 ambient = uAmbientLightColor * uAmbientLightIntensity;",
+
+          //diffuse component
+          "vec3 diffuse = vec3(0.0);",
+
+          "vec4 lightVector = viewMatrix * vec4(vec3(1.0, 0.5, 0.275), 0.0);",
+          "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
+          "diffuse += normalModulator * vec3(1.0, 1.0, 1.0);",
+          // "vec3 finalColor = texture2D(uImageTexture, vUv).xyz * (ambient + diffuse);",
+
+          // "vec4 lightVector = viewMatrix * vec4(directionalLightDirection[i], 0.0);",
+          // "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
+          // "diffuse += normalModulator * directionalLightColor[i];",
+
+          "gl_FragColor = vec4(uBaseColor * (ambient + diffuse), .9);",
+
+          // THREE.ShaderChunk['shadowmap_fragment'],
+
       "}"
-    ].join('\n'),
 
-    scaleAndFlipV: [
-      //Fragment shader to scale and flip a texture
-
-      "uniform sampler2D uTexture;",
-      "uniform float uScale;",
-
-      "varying vec2 vUv;",
-
-      "void main() {",
-        "vec2 scaledAndFlippedUv = vec2(vUv.x * uScale, 1.0 - (vUv.y * uScale));",
-        "gl_FragColor = texture2D(uTexture, scaledAndFlippedUv);",
-      "}"
     ].join('\n'),
 
     lambertCursor: [
@@ -245,6 +255,220 @@ export default {
 
         THREE.ShaderChunk['shadowmap_fragment'],
 
+      "}"
+
+    ].join('\n'),
+
+    hfWater_disturb: [
+
+      //Wave height
+      "uniform float uWaveHeight;",
+      
+      "uniform sampler2D uTexture;",
+
+      //source is not masked by obstacles
+      "uniform int uIsSourcing;",
+      "uniform float uSourceAmount;",
+      "uniform vec2 uSourceSize;",
+      "uniform vec2 uSourcePos;",
+
+      //flood is source for every cell
+      "uniform int uIsFlooding;",
+      "uniform float uFloodAmount;",
+
+      "varying vec2 vUv;",
+
+      "void main() {",
+
+          //read texture from previous step
+          //r channel: height
+          "vec4 t = texture2D(uTexture, vUv);",
+
+          //add source
+          "if (uIsSourcing == 1) {",
+            "float len = length(vUv - vec2(uSourcePos.x, 1.0 - uSourcePos.y));",
+            "float len_x = length(vUv.x - uSourcePos.x);",
+            "float len_y = length(vUv.y - (1.0 - uSourcePos.y));",
+            "float wave_height = uSourceAmount * ",
+              "(1.0 - smoothstep(0.0, uSourceSize.x, len_x)) *",
+              "(1.0 - smoothstep(0.0, uSourceSize.y, len_y));",
+            
+            "t.r += wave_height;",
+              // "t.r += uSourceAmount * (1.0 - smoothstep(0.0, uSourceRadius, len));",
+          "}",
+
+          //add flood
+          "if (uIsFlooding == 1) {",
+              "t.r += uFloodAmount;",
+          "}",
+          
+          //write out to texture for next step
+          "gl_FragColor = t;",
+      "}"
+
+    ].join('\n'),
+
+    hfWater_pipeModel: [
+
+      //GPU version of pipe model water.
+      //Need to run the flux calculation pre-pass first before running this.
+
+      "uniform sampler2D uWaterTexture;",
+      "uniform sampler2D uFluxTexture;",
+      "uniform vec2 uTexelSize;",
+      "uniform float uSegmentSize;",
+      "uniform float uDt;",
+      "uniform float uMinWaterHeight;",
+
+      "varying vec2 vUv;",
+
+      "void main() {",
+
+          "vec2 du = vec2(uTexelSize.r, 0.0);",
+          "vec2 dv = vec2(0.0, uTexelSize.g);",
+
+          //read water texture
+          //r channel: water height
+          //g channel: horizontal velocity x
+          //b channel: horizontal velocity z
+          //a channel: UNUSED
+          "vec4 tWater = texture2D(uWaterTexture, vUv);",
+
+          //read flux textures
+          //r channel: fluxR
+          //g channel: fluxL
+          //b channel: fluxB
+          //a channel: fluxT
+          "vec4 tFlux = texture2D(uFluxTexture, vUv);",
+          "vec4 tFluxPixelLeft = texture2D(uFluxTexture, vUv-du);",
+          "vec4 tFluxPixelRight = texture2D(uFluxTexture, vUv+du);",
+          "vec4 tFluxPixelTop = texture2D(uFluxTexture, vUv+dv);",
+          "vec4 tFluxPixelBottom = texture2D(uFluxTexture, vUv-dv);",
+
+          "float avgWaterHeight = tWater.r;",
+
+          //calculate new height
+          "float fluxOut = tFlux.r + tFlux.g + tFlux.b + tFlux.a;",
+          "float fluxIn = tFluxPixelLeft.r + tFluxPixelRight.g + tFluxPixelTop.b + tFluxPixelBottom.a;",
+          "tWater.r += (fluxIn - fluxOut) * uDt / (uSegmentSize * uSegmentSize);",
+          "tWater.r = max(uMinWaterHeight, tWater.r);",
+
+          "avgWaterHeight = 0.5 * (avgWaterHeight + tWater.r);",  //this will get the average height of that from before and after the change
+
+          //calculate horizontal velocities, from amount of water passing through per unit time
+          "if (avgWaterHeight == 0.0) {",  //prevent division by 0
+              "tWater.g = 0.0;",
+              "tWater.b = 0.0;",
+          "} else {",
+              "float threshold = float(tWater.r > 0.2);",  //0/1 threshold value for masking out weird velocities at terrain edges
+              "float segmentSizeTimesAvgWaterHeight = uSegmentSize * avgWaterHeight;",
+              "tWater.g = threshold * 0.5 * (tFluxPixelLeft.r - tFlux.g + tFlux.r - tFluxPixelRight.g) / segmentSizeTimesAvgWaterHeight;",
+              "tWater.b = threshold * 0.5 * (tFluxPixelTop.b - tFlux.a + tFlux.b - tFluxPixelBottom.a) / segmentSizeTimesAvgWaterHeight;",
+          "}",
+
+          //write out to texture for next step
+          "gl_FragColor = tWater;",
+      "}"
+
+    ].join('\n'),
+
+    hfWater_pipeModel_calcFlux: [
+
+      //GPU version of pipe model water.
+      //This is the pre-pass to calculate flux.
+
+      "uniform sampler2D uTerrainTexture;",
+      "uniform sampler2D uWaterTexture;",
+      "uniform sampler2D uFluxTexture;",
+      "uniform sampler2D uBoundaryTexture;",
+      "uniform vec2 uTexelSize;",
+      "uniform float uDampingFactor;",
+      "uniform float uHeightToFluxFactor;",
+      "uniform float uSegmentSizeSquared;",
+      "uniform float uDt;",
+      "uniform float uMinWaterHeight;",
+
+      "varying vec2 vUv;",
+
+      "void main() {",
+
+          "vec2 du = vec2(uTexelSize.r, 0.0);",
+          "vec2 dv = vec2(0.0, uTexelSize.g);",
+
+          //read terrain texture
+          //r channel: terrain height
+          "vec4 tTerrain = texture2D(uTerrainTexture, vUv);",
+
+          //read water texture
+          //r channel: water height
+          //g, b channels: vel
+          //a channel: UNUSED
+          "vec4 tWater = texture2D(uWaterTexture, vUv);",
+
+          "float waterHeight = tWater.r;",
+          // "float totalHeight = max(tTerrain.r, tObstacle.r) + waterHeight;",
+          "float totalHeight = tTerrain.r + waterHeight;",
+
+          //read flux texture
+          //r channel: fluxR
+          //g channel: fluxL
+          //b channel: fluxB
+          //a channel: fluxT
+          "vec4 tFlux = texture2D(uFluxTexture, vUv);",
+
+          //calculate new flux
+          "tFlux *= uDampingFactor;",
+          "vec4 neighbourTotalHeights = vec4(texture2D(uWaterTexture, vUv + du).r + texture2D(uTerrainTexture, vUv + du).r,",
+                                            "texture2D(uWaterTexture, vUv - du).r + texture2D(uTerrainTexture, vUv - du).r,",
+                                            "texture2D(uWaterTexture, vUv - dv).r + texture2D(uTerrainTexture, vUv - dv).r,",
+                                            "texture2D(uWaterTexture, vUv + dv).r + texture2D(uTerrainTexture, vUv + dv).r);",
+          "tFlux += (totalHeight - neighbourTotalHeights) * uHeightToFluxFactor;",
+          "tFlux = max(vec4(0.0), tFlux);",
+
+          //read boundary texture
+          //r channel: fluxR
+          //g channel: fluxL
+          //b channel: fluxB
+          //a channel: fluxT
+          "vec4 tBoundary = texture2D(uBoundaryTexture, vUv);",
+
+          //multiply flux with boundary texture to mask out fluxes
+          "tFlux *= tBoundary;",
+
+          //scale down outflow if it is more than available volume in the column
+          "float currVol = (waterHeight - uMinWaterHeight) * uSegmentSizeSquared;",
+          "float outVol = uDt * (tFlux.r + tFlux.g + tFlux.b + tFlux.a);",
+          "tFlux *= min(1.0, currVol / outVol);",
+
+          //write out to texture for next step
+          "gl_FragColor = tFlux;",
+      "}"
+
+    ].join('\n'),
+
+    hfWater_pipeModel_calcFinalWaterHeight: [
+
+      //Fragment shader to combine textures
+
+      "uniform sampler2D uTerrainTexture;",
+      "uniform sampler2D uWaterTexture;",
+      "uniform sampler2D uMultiplyTexture;",  //texture to multiply the results of uTerrainTexture + uStaticObstaclesTexture
+      "uniform float uMaskOffset;",  //using uMultiplyTexture as a mask to offset the 0 regions
+
+      "varying vec2 vUv;",
+
+      "void main() {",
+
+          "vec4 t = texture2D(uTerrainTexture, vUv) + texture2D(uWaterTexture, vUv);",
+
+          //read multiply texture and multiply
+          "vec4 tMultiply = texture2D(uMultiplyTexture, vUv);",
+          "t *= tMultiply;",
+
+          //do offset with masking
+          "t += (1.0 - tMultiply) * uMaskOffset;",
+
+          "gl_FragColor = t;",
       "}"
 
     ].join('\n')
