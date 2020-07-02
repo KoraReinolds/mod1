@@ -151,6 +151,7 @@ class Reflector extends Mesh {
 		renderer.xr.enabled = currentXrEnabled;
 		renderer.shadowMap.autoUpdate = currentShadowAutoUpdate;
     renderer.setRenderTarget( currentRenderTarget );
+    // renderer.render(scene, camera);
     this.visible = true;
   }
 }

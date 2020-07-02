@@ -11,7 +11,7 @@ const WATER_DENSITY = 1000;
 const PROXY_TERRAIN_RES = 64;
 const POINTS = [ [10, 10, 10], [10, 5, 5] ];
 let terrainImageSettings = {
-	'points': { src: 'points', preblur: 2, height: 5, points: POINTS, },
+	'points': { src: 'points', preblur: 2, height: 2, points: POINTS, },
 	'image_1': { src: 'images/igms_679104,4595950,680128,4596974_512.jpg', preblur: 9, height: 0.1, },
 	'image_2': { src: 'images/igms_693432,4598934,694456,4599958_512.jpg', preblur: 2, height: 0.3, }
 };
@@ -69,17 +69,19 @@ function initWater() {
 	waterGeom = new THREE.PlaneGeometry(WATER_SIZE, WATER_SIZE, WATER_RES - 1, WATER_RES - 1);
 	waterGeom.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
 	waterMesh = new THREE.Mesh(waterGeom, new THREE.MeshPhongMaterial({ color: '#fff' }));
+	// waterMesh.rotation.x = Math.PI * - 0.5;
 	waterMesh.castShadow = true;
 	waterMesh.receiveShadow = true;
 	waterMesh.type = 'water';
 	gpuWater = new GpuPipeModelWater({
+		camera: camera,
 		renderer: renderer,
 		scene: scene,
 		mesh: waterMesh,
 		size: WATER_SIZE,
 		res: WATER_RES,
 		dampingFactor: 0.995,
-		initialWaterHeight: 0.5,
+		initialWaterHeight: 2.5,
 		terrainTexture: gpuSkulpt.getSculptDisplayTexture(),
 		density: WATER_DENSITY,
 	})
@@ -105,6 +107,19 @@ function initTerrain() {
 	terrainMesh.receiveShadow = true;
 	scene.add(terrainMesh);
 };
+
+function initSkyBox() {
+	const cubeTextureLoader = new THREE.CubeTextureLoader();
+	cubeTextureLoader.setPath( 'textures/cube/Bridge2/' );
+
+	const cubeTexture = cubeTextureLoader.load( [
+		"px.jpg", "nx.jpg",
+		"py.jpg", "ny.jpg",
+		"pz.jpg", "nz.jpg"
+	] );
+
+	scene.background = cubeTexture;
+}
 
 function setupEvents() {
 	let canvas = renderer.domElement;
@@ -393,6 +408,7 @@ initCamera();
 loadImage(terrainImageSettings[options.terrainImage]);
 initTerrain();
 initWater();
+initSkyBox();
 setupEvents();
 setupGui();
 

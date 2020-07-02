@@ -1,10 +1,12 @@
 import Shaders from "../../../shaders.js";
 import * as THREE from "../../../build/three.module.js";
+import Reflector from '../../../Reflector.js';
 
 export default class GpuPipeModelWater {
   constructor(options) {
 
     this.__mesh = options.mesh;
+    this.__camera = options.camera;
     this.__renderer = options.renderer;
     this.__size = options.size;
     this.__scene = options.scene;
@@ -48,11 +50,6 @@ export default class GpuPipeModelWater {
     this.__sourceUvPos = new THREE.Vector2();
     this.__sourceAmount = 0;
 
-    this.__init();
-    
-    this.__terrainTexture = options.terrainTexture || this.__emptyTexture;
-
-
     //some constants
     this.__pipeLength = this.__segmentSize;
     this.__pipeCrossSectionArea = this.__pipeLength * this.__pipeLength;  //square cross-section area
@@ -60,9 +57,192 @@ export default class GpuPipeModelWater {
     this.__heightToFluxFactorNoDt = this.__pipeCrossSectionArea * this.__gravity / this.__pipeLength;
     this.__maxHorizontalSpeed = 10.0;  //just an arbitrary upper-bound estimate //TODO: link this to cross-section area
     this.__maxDt = this.__segmentSize / this.__maxHorizontalSpeed;  //based on CFL condition
+    this.__terrainTexture = options.terrainTexture || this.__emptyTexture;
   
+    this.__init();
+
+    this.clock = new THREE.Clock();
+    this.cycle = 0.15;
+    const loader = new THREE.TextureLoader();
+    this.__textureMatrix = new THREE.Matrix4();
+    loader.load( './textures/Water_1_M_Normal.jpg', function(texture) {
+      this.__normalMapTexture0 = texture;
+      this.__normalMapTexture0.wrapS = this.__normalMapTexture0.wrapT = THREE.RepeatWrapping;
+      this.__mesh.material.uniforms['uNormalTexture0'].value = texture;
+    }.bind(this));
+    loader.load( './textures/Water_2_M_Normal.jpg', function(texture) {
+      this.__normalMapTexture1 = texture;
+      this.__normalMapTexture1.wrapS = this.__normalMapTexture1.wrapT = THREE.RepeatWrapping;
+      this.__mesh.material.uniforms['uNormalTexture1'].value = texture;
+    }.bind(this));
+    this.__reflector = new Reflector(this.__mesh.geometry);
+    this.__reflector.matrixAutoUpdate = false;
+    // console.log(this.__reflector.getRenderTarget().texture);
+    // this.__mesh.material.uniforms['uTextureReflectionMap'].value = this.__reflector.getRenderTarget().texture;
+    this.__textureMatrix = new THREE.Matrix4();
+    
   }
 
+  __onBeforeRender() {
+    let geometry = this.__mesh.geometry;
+    this.__updateTextureMatrix();
+    this.updateFlow();
+    // geometry.geometry.drawCubes();
+    geometry.visible = false;
+    this.__reflector.matrixWorld.copy( this.__mesh.matrixWorld );
+
+    let renderer = this.__renderer;
+    let scene = this.__scene;
+    let camera = this.__camera;
+    // this.__reflector.onBeforeRender( this.__renderer, this.__scene, this.__camera );
+    let reflectorWorldPosition = new THREE.Vector3(); // this reflector position
+    let cameraWorldPosition = new THREE.Vector3(); // camera position
+    let rotationMatrix = new THREE.Matrix4(); // camera rotation matrix
+    let normal = new THREE.Vector3();
+    let view = new THREE.Vector3();
+    let lookAtPosition = new THREE.Vector3();
+    let target = new THREE.Vector3(); 
+    let virtualCamera = new THREE.PerspectiveCamera();
+    let reflectorPlane = new THREE.Plane();
+    let clipPlane = new THREE.Vector4();
+    let q = new THREE.Vector4();
+
+    reflectorWorldPosition.setFromMatrixPosition( this.__reflector.matrixWorld );
+    reflectorWorldPosition.y = 0.0;
+    // reflectorWorldPosition.y = this.geometry.maxLvl;
+    cameraWorldPosition.setFromMatrixPosition( camera.matrixWorld );
+    rotationMatrix.extractRotation( this.__reflector.matrixWorld );
+    // rotationMatrix.makeRotationX(-Math.PI / 2);
+    
+    // rotate normal without translate
+    normal.set( 0, 1, 0 );
+    normal.applyMatrix4( rotationMatrix );
+    
+    view.subVectors( reflectorWorldPosition, cameraWorldPosition ); // distance between camera and reflector
+    // if ( view.dot( normal ) > 0 ) return;
+    view.reflect( normal ).negate();
+		view.add( reflectorWorldPosition );
+    
+    rotationMatrix.extractRotation( camera.matrixWorld );
+
+		lookAtPosition.set( 0, 0, -1 );
+		lookAtPosition.applyMatrix4( rotationMatrix );
+    // lookAtPosition.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+    lookAtPosition.add( cameraWorldPosition );
+
+    
+    target.subVectors( reflectorWorldPosition, lookAtPosition );
+		target.reflect( normal ).negate();
+    target.add( reflectorWorldPosition );
+    
+    virtualCamera.position.copy( view );
+		virtualCamera.up.set( 0, 1, 0 );
+		virtualCamera.up.applyMatrix4( rotationMatrix );
+		virtualCamera.up.reflect( normal );
+		virtualCamera.lookAt( target );
+		virtualCamera.far = camera.far; // Used in WebGLBackground
+		virtualCamera.updateMatrixWorld();
+    virtualCamera.projectionMatrix.copy( camera.projectionMatrix );
+
+
+		// Update the texture matrix
+		this.__textureMatrix.set(
+			0.5, 0.0, 0.0, 0.5,
+			0.0, 0.5, 0.0, 0.5,
+			0.0, 0.0, 0.5, 0.5,
+			0.0, 0.0, 0.0, 1.0
+		);
+		this.__textureMatrix.multiply( virtualCamera.projectionMatrix );
+		this.__textureMatrix.multiply( virtualCamera.matrixWorldInverse );
+		this.__textureMatrix.multiply( this.__reflector.matrixWorld );
+
+		// Now update projection matrix with new clip plane, implementing code from: http://www.terathon.com/code/oblique.html
+    // Paper explaining this technique: http://www.terathon.com/lengyel/Lengyel-Oblique.pdf
+		reflectorPlane.setFromNormalAndCoplanarPoint( normal, reflectorWorldPosition );
+		reflectorPlane.applyMatrix4( virtualCamera.matrixWorldInverse );
+
+		clipPlane.set( reflectorPlane.normal.x, reflectorPlane.normal.y, reflectorPlane.normal.z, reflectorPlane.constant );
+
+		var projectionMatrix = virtualCamera.projectionMatrix;
+
+		q.x = ( Math.sign( clipPlane.x ) + projectionMatrix.elements[ 8 ] ) / projectionMatrix.elements[ 0 ];
+		q.y = ( Math.sign( clipPlane.y ) + projectionMatrix.elements[ 9 ] ) / projectionMatrix.elements[ 5 ];
+		q.z = - 1.0;
+		q.w = ( 1.0 + projectionMatrix.elements[ 10 ] ) / projectionMatrix.elements[ 14 ];
+
+		// Calculate the scaled plane vector
+		clipPlane.multiplyScalar( 2.0 / clipPlane.dot( q ) );
+
+		// Replacing the third row of the projection matrix
+		projectionMatrix.elements[ 2 ] = clipPlane.x;
+		projectionMatrix.elements[ 6 ] = clipPlane.y;
+		projectionMatrix.elements[ 10 ] = clipPlane.z + 1.0;
+		projectionMatrix.elements[ 14 ] = clipPlane.w;
+    
+    this.__reflector.visible = false;
+		var currentRenderTarget = renderer.getRenderTarget();
+		var currentXrEnabled = renderer.xr.enabled;
+		var currentShadowAutoUpdate = renderer.shadowMap.autoUpdate;
+		renderer.xr.enabled = false; // Avoid camera modification
+    renderer.shadowMap.autoUpdate = false; // Avoid re-computing shadows
+    
+    // this.__setShaderAndRender(this.__reflectorMaterial, this.__rttRenderTargetReflector);
+
+		renderer.setRenderTarget( this.__rttRenderTargetReflector );
+		renderer.state.buffers.depth.setMask( true ); // make sure the depth buffer is writable so it can be properly cleared, see #18897
+		if ( renderer.autoClear === false ) renderer.clear();
+		renderer.render( scene, virtualCamera );
+		renderer.xr.enabled = currentXrEnabled;
+		renderer.shadowMap.autoUpdate = currentShadowAutoUpdate;
+    renderer.setRenderTarget( currentRenderTarget );
+    // renderer.render(scene, camera);
+    this.__reflector.visible = true;
+    
+    this.__mesh.material.uniforms["uTextureReflectionMap"].value = this.__rttRenderTargetReflector.texture;
+    // this.__mesh.material.uniforms["uTextureReflectionMap"].value =  this.__rttRenderTarget1.texture;
+
+    geometry.visible = true;
+  };
+
+  updateFlow() {
+    const cycle = this.cucle; // a cycle of a flow map phase
+    const halfCycle = this.cycle * 0.5;
+
+    const delta = this.clock.getDelta();
+    const config = this.__mesh.material.uniforms[ "uConfig" ];
+		config.value.x += 0.03 * delta; // flowMapOffset0
+		config.value.y = config.value.x + halfCycle; // flowMapOffset1
+
+		// Important: The distance between offsets should be always the value of "halfCycle".
+		// Moreover, both offsets should be in the range of [ 0, cycle ].
+		// This approach ensures a smooth water flow and avoids "reset" effects.
+
+		if ( config.value.x >= cycle ) {
+			config.value.x = 0;
+			config.value.y = halfCycle;
+		} else if ( config.value.y >= cycle ) {
+			config.value.y = config.value.y - cycle;
+		}
+  }
+  
+  __updateTextureMatrix() {
+
+    let camera = this.__camera;
+
+    // console.log(geometry.textureMatrix, geometry)
+		this.__textureMatrix.set(
+			0.5, 0.0, 0.0, 0.5,
+			0.0, 0.5, 0.0, 0.5,
+			0.0, 0.0, 0.5, 0.5,
+			0.0, 0.0, 0.0, 1.0
+		);
+
+		this.__textureMatrix.multiply( camera.projectionMatrix );
+		this.__textureMatrix.multiply( camera.matrixWorldInverse );
+		this.__textureMatrix.multiply( this.__mesh.matrixWorld );
+
+  }
+  
   __init() {
     this.__setupRttScene();
     //create an empty texture because the default value of textures does not seem to be 0?
@@ -162,9 +342,21 @@ export default class GpuPipeModelWater {
     this.__rttRenderTargetFlux2 = this.__rttRenderTarget1.clone();
     //create another RTT render target for storing the combined terrain + water heights
     this.__rttCombinedHeight = this.__rttRenderTarget1.clone();
+    //reflector RTT
+    this.__rttRenderTargetReflector = this.__rttRenderTarget1.clone();
   }
 
   __setupShaders() {
+
+    this.__reflectorMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        textureMatrix: { value: this.__textureMatrix },
+        tDiffuse: { type: 'sampler2D', value: this.__emptyTexture },
+      },
+      vertexShader: Shaders.reflectorVertexShader,
+      fragmentShader: Shaders.reflectorFragmentShader,
+      transparent: true,
+    });
 
     this.__disturbAndSourceMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -231,10 +423,28 @@ export default class GpuPipeModelWater {
   __setupVtf = function () {
     this.__mesh.material = new THREE.ShaderMaterial({
       uniforms: {
+        uConfig: {
+          type: 'v4',
+          value: new THREE.Vector4(
+            0, // flowMapOffset0
+            this.cycle / 2, // flowMapOffset1
+            this.cycle / 2, // halfCycle
+            1.0, // scale
+          ),
+        },
+        uColor: { type: 'c', value: null },
+        uTextureMatrix: { value: this.__textureMatrix },
+        uTextureNormalMap0: { type: 'sampler2D', value: this.__normalMapTexture0 },
+        uTextureNormalMap1: { type: 'sampler2D', value: this.__normalMapTexture1 },
+        uTextureReflectionMap: { type: 'sampler2D', value: this.__emptyTexture },
+        uFlowDirection: { type: 'v2', value: new THREE.Vector2( 0, -1 ) },
+
         uTexture: { type: 't', value: this.__rttRenderTarget1.texture },
         uTexelSize: { type: 'v2', value: new THREE.Vector2(this.__texelSize, this.__texelSize) },
         uTexelWorldSize: { type: 'v2', value: new THREE.Vector2(this.__segmentSize, this.__segmentSize) },
         uHeightMultiplier: { type: 'f', value: 1.0 },
+        uNormalTexture0: { type: 't', value: this.__emptyTexture },
+        uNormalTexture1: { type: 't', value: this.__emptyTexture },
         uBaseColor: { type: 'v3', value: new THREE.Vector3(0.45, 0.95, 1.0) }
       },
       vertexShader: Shaders.vert['heightMapWater'],
@@ -247,6 +457,7 @@ export default class GpuPipeModelWater {
     //fix dt for the moment (better to be in slow-mo in extreme cases than to explode)
     dt = 1.0 / 60.0;
     //do multiple full steps per frame to speed up some of algorithms that are slow to propagate at high mesh resolutions
+    this.__onBeforeRender()
     for (let i = 0; i < this.__multisteps; i++) { this.__step(dt); }
     //post step
     this.__postStepPass();

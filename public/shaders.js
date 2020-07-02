@@ -3,6 +3,16 @@ import * as THREE from "../../../build/three.module.js";
 export default {
   vert: {
 
+    reflectorVertexShader: [
+      "uniform mat4 textureMatrix;",
+      "varying vec2 vUv;",
+
+      "void main() {",
+        "vUv = textureMatrix * vec4( position, 1.0 );",
+        "gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+      "}",
+    ].join('\n'),
+
     passUv: [
       //Pass-through vertex shader for passing interpolated UVs to fragment shader
       "varying vec2 vUv;",
@@ -120,6 +130,16 @@ export default {
 
   frag: {
 
+    reflectorFragmentShader: [
+      "varying vec2 vUv;",
+      "uniform sampler2D tDiffuse;",
+      
+      "void main() {",
+        "vec3 color = texture2D(tDiffuse, vUv).xyz;",
+        "gl_FragColor = vec4( color, 1.0 );",
+      "}",
+    ].join('\n'),
+
     setColor: [
       //Fragment shader to set colors on a render target
       "uniform vec4 uColor;",
@@ -180,6 +200,15 @@ export default {
       "uniform vec3 uAmbientLightColor;",
       "uniform float uAmbientLightIntensity;",
 
+      "uniform sampler2D uNormalTexture0;",
+      "uniform sampler2D uNormalTexture1;",
+      // "uniform uColor",
+      // "uniform uTextureMatrix",
+      // "uniform uTextureNormalMap0",
+      // "uniform uTextureNormalMap1",
+      "uniform sampler2D uTextureReflectionMap;",
+      // "uniform uFlowDirection",
+
       "varying vec3 vViewPos;",
       "varying vec3 vViewNormal;",
       "varying vec2 vUv;",
@@ -190,6 +219,9 @@ export default {
 
           //ambient component
           "vec3 ambient = uAmbientLightColor * uAmbientLightIntensity;",
+
+          "vec4 normalColor0 = texture2D(uNormalTexture0, vUv);",
+          "vec4 reflectorColor0 = texture2D(uTextureReflectionMap, vUv);",
 
           //diffuse component
           "vec3 diffuse = vec3(0.0);",
@@ -203,7 +235,7 @@ export default {
           // "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
           // "diffuse += normalModulator * directionalLightColor[i];",
 
-          "gl_FragColor = vec4(uBaseColor * (ambient + diffuse), .9);",
+          "gl_FragColor = vec4(reflectorColor0.xyz * (ambient + diffuse), 0.9);",
 
           // THREE.ShaderChunk['shadowmap_fragment'],
 
@@ -452,7 +484,7 @@ export default {
 
       "uniform sampler2D uTerrainTexture;",
       "uniform sampler2D uWaterTexture;",
-      "uniform sampler2D uMultiplyTexture;",  //texture to multiply the results of uTerrainTexture + uStaticObstaclesTexture
+      "uniform sampler2D uMultiplyTexture;",  //texture to multiply the results of uTerrainTexture
       "uniform float uMaskOffset;",  //using uMultiplyTexture as a mask to offset the 0 regions
 
       "varying vec2 vUv;",
