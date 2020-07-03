@@ -10,18 +10,27 @@ const TERRAIN_SIZE = 6, WATER_SIZE = 6;
 const WATER_DENSITY = 1000;
 const PROXY_TERRAIN_RES = 64;
 const POINTS = [ [10, 10, 10], [10, 5, 5] ];
+let skyBoxTextures = {
+	park: "Park2",
+	bridge: "Bridge2",
+	space: "MilkyWay",
+	parkWinter: "Park3Med",
+	castle: "SwedishRoyalCastle",
+};
 let terrainImageSettings = {
-	'points': { src: 'points', preblur: 2, height: 2, points: POINTS, },
+	'points': { src: 'points', preblur: 2, height: 5, points: POINTS, },
 	'image_1': { src: 'images/igms_679104,4595950,680128,4596974_512.jpg', preblur: 9, height: 0.1, },
 	'image_2': { src: 'images/igms_693432,4598934,694456,4599958_512.jpg', preblur: 2, height: 0.3, }
 };
-let terrainTextures = [
-  './textures/grass.jpg',
-  './textures/SandBig.jpg',
-]
+let terrainTextures = {
+  grass: './textures/grass.jpg',
+  sand: './textures/SandBig.jpg',
+};
 let terrainGeom, terrainMesh, renderer, camera, gpuSkulpt, controls, gpuWater, waterGeom, waterMesh;
 let options = {
+	skyBoxTexture: Object.keys(skyBoxTextures)[0],
 	terrainImage: Object.keys(terrainImageSettings)[0],
+	terrainTexture: Object.keys(terrainTextures)[0],
 	terrainPreblur: 1.0,
 	terrainHeight: 1.0,
 	waterSourceAmount: 0.08,
@@ -69,7 +78,6 @@ function initWater() {
 	waterGeom = new THREE.PlaneGeometry(WATER_SIZE, WATER_SIZE, WATER_RES - 1, WATER_RES - 1);
 	waterGeom.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
 	waterMesh = new THREE.Mesh(waterGeom, new THREE.MeshPhongMaterial({ color: '#fff' }));
-	// waterMesh.rotation.x = Math.PI * - 0.5;
 	waterMesh.castShadow = true;
 	waterMesh.receiveShadow = true;
 	waterMesh.type = 'water';
@@ -100,7 +108,7 @@ function initTerrain() {
 		res: TERRAIN_RES,
 		proxyRes: PROXY_TERRAIN_RES,
 	});
-	new THREE.TextureLoader().load(terrainTextures[0], function ( texture ) {
+	new THREE.TextureLoader().load(terrainTextures[options.terrainTexture], function ( texture ) {
 		gpuSkulpt.setTexture(texture);
 	});
 	terrainMesh.castShadow = true;
@@ -108,9 +116,9 @@ function initTerrain() {
 	scene.add(terrainMesh);
 };
 
-function initSkyBox() {
+function loadSkyBox(dir) {
 	const cubeTextureLoader = new THREE.CubeTextureLoader();
-	cubeTextureLoader.setPath( 'textures/cube/Bridge2/' );
+	cubeTextureLoader.setPath( `textures/cube/${dir}/` );
 
 	const cubeTexture = cubeTextureLoader.load( [
 		"px.jpg", "nx.jpg",
@@ -291,7 +299,6 @@ function sculptTerrain(type, position, amount) {
 
 function loadImage(opt) {
 	imageLoader.load(opt).then((data) => {
-		console.log(opt)
 		options.terrainPreblur = opt.preblur;
 		options.terrainHeight = opt.height;
 		filterTerrainImageAndGenerateHeight(data);
@@ -301,13 +308,25 @@ function loadImage(opt) {
 function setupGui() {
 	let gui = new dat.GUI({width: 300});
 
-	//Wave folder
-	let waveFolder = gui.addFolder('Wave');
-	waveFolder.open();
+	gui.add(options, 'skyBoxTexture', Object.keys(skyBoxTextures))
+		.name('Background texture')
+		.listen()
+		.onChange(function(value) {
+			loadSkyBox(skyBoxTextures[value]);
+		})
 
 	//Terrain folder
 	let terrainFolder = gui.addFolder('Terrain');
 	terrainFolder.open();
+
+	terrainFolder.add(options, 'terrainTexture', Object.keys(terrainTextures))
+	.name('Terrain texture')
+	.listen()
+	.onChange(function(value) {
+		new THREE.TextureLoader().load(terrainTextures[value], function ( texture ) {
+			gpuSkulpt.setTexture(texture);
+		});
+	})
 
 	terrainFolder
 		.add(options, 'terrainImage', Object.keys(terrainImageSettings))
@@ -382,11 +401,10 @@ function setupGui() {
 			options.waterSourceSizeX = Math.min(options.waterSourceSizeX, 0.6 - value)
 		})
 
-
 	waterFolder.add(options, 'waterSourceAmount', -0.2, 0.2)
 		.name('Source Amount')
 		.listen()
-
+		
 }
 
 
@@ -408,7 +426,7 @@ initCamera();
 loadImage(terrainImageSettings[options.terrainImage]);
 initTerrain();
 initWater();
-initSkyBox();
+loadSkyBox(skyBoxTextures[options.skyBoxTexture]);
 setupEvents();
 setupGui();
 

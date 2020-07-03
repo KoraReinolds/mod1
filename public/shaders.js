@@ -3,16 +3,6 @@ import * as THREE from "../../../build/three.module.js";
 export default {
   vert: {
 
-    reflectorVertexShader: [
-      "uniform mat4 textureMatrix;",
-      "varying vec2 vUv;",
-
-      "void main() {",
-        "vUv = textureMatrix * vec4( position, 1.0 );",
-        "gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
-      "}",
-    ].join('\n'),
-
     passUv: [
       //Pass-through vertex shader for passing interpolated UVs to fragment shader
       "varying vec2 vUv;",
@@ -25,7 +15,9 @@ export default {
 
     heightMapWater: [
 
-      //Vertex shader that displaces vertices in local Y based on a texture
+      "varying vec3 v_normal;",
+      "uniform mat4 uTextureMatrix;",
+      "varying vec4 vCoord;",
 
       "uniform sampler2D uTexture;",
       "uniform vec2 uTexelSize;",
@@ -36,11 +28,11 @@ export default {
       "varying vec3 vViewNormal;",
       "varying vec2 vUv;",
 
-      // THREE.ShaderChunk['shadowmap_pars_vertex'],
-
       "void main() {",
 
           "vUv = uv;",
+
+          "vCoord = uTextureMatrix * vec4( position, 1.0 );",
 
           //displace y based on texel value
           "vec4 t = texture2D(uTexture, vUv) * uHeightMultiplier;",
@@ -62,14 +54,13 @@ export default {
                               "texture2D(uTexture, vUv - dv).r * uHeightMultiplier,",
                               "displacedPos.z + uTexelWorldSize.g) - displacedPos;",
           "vViewNormal = normalize(normalMatrix * 0.25 * (cross(vecPosU, vecPosV) + cross(vecPosV, vecNegU) + cross(vecNegU, vecNegV) + cross(vecNegV, vecPosU)));",
+          "v_normal = vViewNormal;",
 
           "vec4 worldPosition = modelMatrix * vec4(displacedPos, 1.0);",
           "vec4 viewPos = modelViewMatrix * vec4(displacedPos, 1.0);",
           "vViewPos = viewPos.rgb;",
 
           "gl_Position = projectionMatrix * viewPos;",
-
-          // THREE.ShaderChunk['shadowmap_vertex'],
 
       "}"
 
@@ -130,16 +121,6 @@ export default {
 
   frag: {
 
-    reflectorFragmentShader: [
-      "varying vec2 vUv;",
-      "uniform sampler2D tDiffuse;",
-      
-      "void main() {",
-        "vec3 color = texture2D(tDiffuse, vUv).xyz;",
-        "gl_FragColor = vec4( color, 1.0 );",
-      "}",
-    ].join('\n'),
-
     setColor: [
       //Fragment shader to set colors on a render target
       "uniform vec4 uColor;",
@@ -196,48 +177,59 @@ export default {
 
     lambert: [
 
+      "varying vec4 vCoord;",
+      "varying vec3 v_normal;",
+      "uniform vec4 uConfig;",
+
       "uniform vec3 uBaseColor;",
       "uniform vec3 uAmbientLightColor;",
       "uniform float uAmbientLightIntensity;",
 
       "uniform sampler2D uNormalTexture0;",
       "uniform sampler2D uNormalTexture1;",
-      // "uniform uColor",
-      // "uniform uTextureMatrix",
-      // "uniform uTextureNormalMap0",
-      // "uniform uTextureNormalMap1",
+      "uniform sampler2D uTextureNormalMap0;",
+      "uniform sampler2D uTextureNormalMap1;",
       "uniform sampler2D uTextureReflectionMap;",
-      // "uniform uFlowDirection",
+      "uniform vec2 uFlowDirection;",
 
       "varying vec3 vViewPos;",
       "varying vec3 vViewNormal;",
       "varying vec2 vUv;",
 
-      // THREE.ShaderChunk['shadowmap_pars_fragment'],
-
       "void main() {",
 
-          //ambient component
-          "vec3 ambient = uAmbientLightColor * uAmbientLightIntensity;",
+        "float flowMapOffset0 = uConfig.x;",
+        "float flowMapOffset1 = uConfig.y;",
+        "float halfCycle = uConfig.z;",
+        "float scale = uConfig.w;",
 
-          "vec4 normalColor0 = texture2D(uNormalTexture0, vUv);",
-          "vec4 reflectorColor0 = texture2D(uTextureReflectionMap, vUv);",
+        "vec3 normal = normalize(v_normal);",
+        "float light = dot(normal, vec3(0.5, 0.9182, 0.3));",
 
-          //diffuse component
-          "vec3 diffuse = vec3(0.0);",
+        "vec4 normalColor0 = texture2D( uTextureNormalMap0, ( vUv ) + uFlowDirection * flowMapOffset0 );",
+        "vec4 normalColor1 = texture2D( uTextureNormalMap1, ( vUv ) + uFlowDirection * flowMapOffset1 );",
+        "float flowLerp = abs( halfCycle - flowMapOffset0 ) / halfCycle;",
+        "vec4 normalColor = mix( normalColor0, normalColor1, 1.0 );",
+        "vec3 normal2 = normalize( vec3(",
+          "normalColor.r * 2.0 - 1.0,",
+          "normalColor.b,",
+          "normalColor.g * 2.0 - 1.0 ) );",
 
-          "vec4 lightVector = viewMatrix * vec4(vec3(1.0, 0.5, 0.275), 0.0);",
-          "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
-          "diffuse += normalModulator * vec3(1.0, 1.0, 1.0);",
-          // "vec3 finalColor = texture2D(uImageTexture, vUv).xyz * (ambient + diffuse);",
+        "vec3 coord = vCoord.xyz / vCoord.w;",
+        "vec2 uv = coord.xy + coord.z * normal2.xz * 0.05;",
+        
+        "vec4 reflectColor = texture2D( uTextureReflectionMap, vec2( 1.0 - uv.x, uv.y ) );",
+        //ambient component
+        "vec3 ambient = uAmbientLightColor * uAmbientLightIntensity;",
 
-          // "vec4 lightVector = viewMatrix * vec4(directionalLightDirection[i], 0.0);",
-          // "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
-          // "diffuse += normalModulator * directionalLightColor[i];",
+        //diffuse component
+        "vec3 diffuse = vec3(0.0);",
 
-          "gl_FragColor = vec4(reflectorColor0.xyz * (ambient + diffuse), 0.9);",
+        "vec4 lightVector = viewMatrix * vec4(vec3(1.0, 0.5, 0.275), 0.0);",
+        "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
+        "diffuse += normalModulator * vec3(1.0, 1.0, 1.0);",
 
-          // THREE.ShaderChunk['shadowmap_fragment'],
+        "gl_FragColor = vec4(reflectColor.xyz * diffuse, 0.66);",
 
       "}"
 
@@ -326,7 +318,6 @@ export default {
               "(1.0 - smoothstep(0.0, uSourceSize.y, len_y));",
             
             "t.r += wave_height;",
-              // "t.r += uSourceAmount * (1.0 - smoothstep(0.0, uSourceRadius, len));",
           "}",
 
           //add flood

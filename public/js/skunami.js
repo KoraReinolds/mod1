@@ -60,30 +60,30 @@ export default class GpuPipeModelWater {
     this.__terrainTexture = options.terrainTexture || this.__emptyTexture;
   
     this.__init();
+    
+  }
 
-    this.clock = new THREE.Clock();
-    this.cycle = 0.15;
+  __initReflector() {
+    this.__clock = new THREE.Clock();
+    this.__cycle = 0.15;
     const loader = new THREE.TextureLoader();
     this.__textureMatrix = new THREE.Matrix4();
     loader.load( './textures/Water_1_M_Normal.jpg', function(texture) {
       this.__normalMapTexture0 = texture;
       this.__normalMapTexture0.wrapS = this.__normalMapTexture0.wrapT = THREE.RepeatWrapping;
-      this.__mesh.material.uniforms['uNormalTexture0'].value = texture;
+      this.__mesh.material.uniforms['uTextureNormalMap0'].value = texture;
     }.bind(this));
     loader.load( './textures/Water_2_M_Normal.jpg', function(texture) {
       this.__normalMapTexture1 = texture;
       this.__normalMapTexture1.wrapS = this.__normalMapTexture1.wrapT = THREE.RepeatWrapping;
-      this.__mesh.material.uniforms['uNormalTexture1'].value = texture;
+      this.__mesh.material.uniforms['uTextureNormalMap1'].value = texture;
     }.bind(this));
     this.__reflector = new Reflector(this.__mesh.geometry);
     this.__reflector.matrixAutoUpdate = false;
-    // console.log(this.__reflector.getRenderTarget().texture);
-    // this.__mesh.material.uniforms['uTextureReflectionMap'].value = this.__reflector.getRenderTarget().texture;
     this.__textureMatrix = new THREE.Matrix4();
-    
   }
 
-  __onBeforeRender() {
+  __renderReflector() {
     let geometry = this.__mesh.geometry;
     this.__updateTextureMatrix();
     this.updateFlow();
@@ -108,7 +108,7 @@ export default class GpuPipeModelWater {
     let q = new THREE.Vector4();
 
     reflectorWorldPosition.setFromMatrixPosition( this.__reflector.matrixWorld );
-    reflectorWorldPosition.y = 0.0;
+    // reflectorWorldPosition.y = -3.0;
     // reflectorWorldPosition.y = this.geometry.maxLvl;
     cameraWorldPosition.setFromMatrixPosition( camera.matrixWorld );
     rotationMatrix.extractRotation( this.__reflector.matrixWorld );
@@ -119,7 +119,6 @@ export default class GpuPipeModelWater {
     normal.applyMatrix4( rotationMatrix );
     
     view.subVectors( reflectorWorldPosition, cameraWorldPosition ); // distance between camera and reflector
-    // if ( view.dot( normal ) > 0 ) return;
     view.reflect( normal ).negate();
 		view.add( reflectorWorldPosition );
     
@@ -127,7 +126,6 @@ export default class GpuPipeModelWater {
 
 		lookAtPosition.set( 0, 0, -1 );
 		lookAtPosition.applyMatrix4( rotationMatrix );
-    // lookAtPosition.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
     lookAtPosition.add( cameraWorldPosition );
 
     
@@ -143,7 +141,6 @@ export default class GpuPipeModelWater {
 		virtualCamera.far = camera.far; // Used in WebGLBackground
 		virtualCamera.updateMatrixWorld();
     virtualCamera.projectionMatrix.copy( camera.projectionMatrix );
-
 
 		// Update the texture matrix
 		this.__textureMatrix.set(
@@ -179,50 +176,21 @@ export default class GpuPipeModelWater {
 		projectionMatrix.elements[ 10 ] = clipPlane.z + 1.0;
 		projectionMatrix.elements[ 14 ] = clipPlane.w;
     
-    this.__reflector.visible = false;
-		var currentRenderTarget = renderer.getRenderTarget();
-		var currentXrEnabled = renderer.xr.enabled;
-		var currentShadowAutoUpdate = renderer.shadowMap.autoUpdate;
-		renderer.xr.enabled = false; // Avoid camera modification
-    renderer.shadowMap.autoUpdate = false; // Avoid re-computing shadows
-    
-    // this.__setShaderAndRender(this.__reflectorMaterial, this.__rttRenderTargetReflector);
-
 		renderer.setRenderTarget( this.__rttRenderTargetReflector );
-		renderer.state.buffers.depth.setMask( true ); // make sure the depth buffer is writable so it can be properly cleared, see #18897
-		if ( renderer.autoClear === false ) renderer.clear();
+		renderer.clear();
 		renderer.render( scene, virtualCamera );
-		renderer.xr.enabled = currentXrEnabled;
-		renderer.shadowMap.autoUpdate = currentShadowAutoUpdate;
-    renderer.setRenderTarget( currentRenderTarget );
-    // renderer.render(scene, camera);
-    this.__reflector.visible = true;
+    renderer.setRenderTarget( null );
     
     this.__mesh.material.uniforms["uTextureReflectionMap"].value = this.__rttRenderTargetReflector.texture;
-    // this.__mesh.material.uniforms["uTextureReflectionMap"].value =  this.__rttRenderTarget1.texture;
 
     geometry.visible = true;
   };
 
   updateFlow() {
-    const cycle = this.cucle; // a cycle of a flow map phase
-    const halfCycle = this.cycle * 0.5;
-
-    const delta = this.clock.getDelta();
+    const delta = this.__clock.getDelta();
     const config = this.__mesh.material.uniforms[ "uConfig" ];
 		config.value.x += 0.03 * delta; // flowMapOffset0
-		config.value.y = config.value.x + halfCycle; // flowMapOffset1
-
-		// Important: The distance between offsets should be always the value of "halfCycle".
-		// Moreover, both offsets should be in the range of [ 0, cycle ].
-		// This approach ensures a smooth water flow and avoids "reset" effects.
-
-		if ( config.value.x >= cycle ) {
-			config.value.x = 0;
-			config.value.y = halfCycle;
-		} else if ( config.value.y >= cycle ) {
-			config.value.y = config.value.y - cycle;
-		}
+    config.value.y = config.value.x + this.__cycle * 0.5; // flowMapOffset1
   }
   
   __updateTextureMatrix() {
@@ -239,7 +207,8 @@ export default class GpuPipeModelWater {
 
 		this.__textureMatrix.multiply( camera.projectionMatrix );
 		this.__textureMatrix.multiply( camera.matrixWorldInverse );
-		this.__textureMatrix.multiply( this.__mesh.matrixWorld );
+    this.__textureMatrix.multiply( this.__mesh.matrixWorld );
+    this.__mesh.material.uniforms["uTextureMatrix"].value = this.__textureMatrix;
 
   }
   
@@ -264,6 +233,7 @@ export default class GpuPipeModelWater {
     this.__setupRttRenderTargets();
     this.__setupShaders();
     this.__setupVtf();
+    this.__initReflector();
   }
 
   __setupRttScene() {
@@ -348,16 +318,6 @@ export default class GpuPipeModelWater {
 
   __setupShaders() {
 
-    this.__reflectorMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        textureMatrix: { value: this.__textureMatrix },
-        tDiffuse: { type: 'sampler2D', value: this.__emptyTexture },
-      },
-      vertexShader: Shaders.reflectorVertexShader,
-      fragmentShader: Shaders.reflectorFragmentShader,
-      transparent: true,
-    });
-
     this.__disturbAndSourceMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uTexture: { type: 't', value: this.__emptyTexture },
@@ -427,8 +387,8 @@ export default class GpuPipeModelWater {
           type: 'v4',
           value: new THREE.Vector4(
             0, // flowMapOffset0
-            this.cycle / 2, // flowMapOffset1
-            this.cycle / 2, // halfCycle
+            this.__cycle / 2, // flowMapOffset1
+            this.__cycle / 2, // halfCycle
             1.0, // scale
           ),
         },
@@ -457,7 +417,7 @@ export default class GpuPipeModelWater {
     //fix dt for the moment (better to be in slow-mo in extreme cases than to explode)
     dt = 1.0 / 60.0;
     //do multiple full steps per frame to speed up some of algorithms that are slow to propagate at high mesh resolutions
-    this.__onBeforeRender()
+    this.__renderReflector()
     for (let i = 0; i < this.__multisteps; i++) { this.__step(dt); }
     //post step
     this.__postStepPass();
