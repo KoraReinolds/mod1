@@ -10,5 +10,5 @@ console.log(`server started ${port}`);
 
 app.route('/*')
   .get((req, res) => {
-    res.sendFile(path.join(`${__dirname}/public/index2.html`));
+    res.sendFile(path.join(`${__dirname}/public/index.html`));
   });
