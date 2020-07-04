@@ -1,5 +1,5 @@
-import * as THREE from "../../../build/three.module.js";
-import Shaders from "../../../shaders.js";
+import Shaders from "../shaders.js";
+import * as THREE from "../build/three.module.js";
 
 const ADD = 1;
 const REMOVE = 2;

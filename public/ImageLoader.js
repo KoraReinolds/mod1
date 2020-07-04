@@ -1,4 +1,4 @@
-import * as StackBlur from './js/stackblur/stackblur-es.min.js';
+import * as StackBlur from './js/stackblur/stackblur-es.js';
 
 export default class ImageLoader {
   constructor({ width, height }) {

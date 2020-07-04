@@ -1,9 +1,9 @@
-import { OrbitControls } from "./jsm/controls/OrbitControls.js";
+import { OrbitControls } from "./js/threejs/OrbitControls.js";
 import ImageLoader from "./ImageLoader.js";
 import dat from "./js/dat.gui/dat.gui.module.js";
-import SKULPT from "./js/skulpt/skulpt.js";
-import GpuPipeModelWater from "./js/skunami.js";
-import * as THREE from "../../../build/three.module.js";
+import SKULPT from "./js/GpuSculpt.js";
+import GpuPipeModelWater from "./js/GpuPipeModelWater.js";
+import * as THREE from "./build/three.module.js";
 
 const TERRAIN_RES = 256, WATER_RES = 256;
 const TERRAIN_SIZE = 6, WATER_SIZE = 6;
@@ -19,8 +19,12 @@ let skyBoxTextures = {
 };
 let terrainImageSettings = {
 	'points': { src: 'points', preblur: 2, height: 5, points: POINTS, },
-	'image_1': { src: 'images/igms_679104,4595950,680128,4596974_512.jpg', preblur: 9, height: 0.1, },
-	'image_2': { src: 'images/igms_693432,4598934,694456,4599958_512.jpg', preblur: 2, height: 0.3, }
+	'image_1': { src: 'textures/hm/hm1.png', preblur: 1, height: 3.0, },
+	'image_2': { src: 'textures/hm/hm2.jpg', preblur: 5, height: 1.0, },
+	'image_3': { src: 'textures/hm/hm3.jpg', preblur: 4, height: 3.0, },
+	'image_4': { src: 'textures/hm/hm4.png', preblur: 1, height: 3.0, },
+	'image_5': { src: 'textures/hm/hm5.jpg', preblur: 5, height: 1.0, },
+	'image_6': { src: 'textures/hm/hm6.png', preblur: 1, height: 3.0, },
 };
 let terrainTextures = {
   grass: './textures/grass.jpg',

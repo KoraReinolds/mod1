@@ -1,4 +1,4 @@
-import * as THREE from "../../../build/three.module.js";
+import * as THREE from "./build/three.module.js";
 
 export default {
   vert: {
@@ -290,7 +290,6 @@ export default {
       
       "uniform sampler2D uTexture;",
 
-      //source is not masked by obstacles
       "uniform int uIsSourcing;",
       "uniform float uSourceAmount;",
       "uniform vec2 uSourceSize;",
@@ -429,7 +428,6 @@ export default {
           "vec4 tWater = texture2D(uWaterTexture, vUv);",
 
           "float waterHeight = tWater.r;",
-          // "float totalHeight = max(tTerrain.r, tObstacle.r) + waterHeight;",
           "float totalHeight = tTerrain.r + waterHeight;",
 
           //read flux texture

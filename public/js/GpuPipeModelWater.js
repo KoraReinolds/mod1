@@ -1,6 +1,5 @@
-import Shaders from "../../../shaders.js";
-import * as THREE from "../../../build/three.module.js";
-import Reflector from '../../../Reflector.js';
+import Shaders from "../shaders.js";
+import * as THREE from "../build/three.module.js";
 
 export default class GpuPipeModelWater {
   constructor(options) {
@@ -78,7 +77,7 @@ export default class GpuPipeModelWater {
       this.__normalMapTexture1.wrapS = this.__normalMapTexture1.wrapT = THREE.RepeatWrapping;
       this.__mesh.material.uniforms['uTextureNormalMap1'].value = texture;
     }.bind(this));
-    this.__reflector = new Reflector(this.__mesh.geometry);
+    this.__reflector = new THREE.Mesh(this.__mesh.geometry, null);
     this.__reflector.matrixAutoUpdate = false;
     this.__textureMatrix = new THREE.Matrix4();
   }
@@ -87,14 +86,12 @@ export default class GpuPipeModelWater {
     let geometry = this.__mesh.geometry;
     this.__updateTextureMatrix();
     this.updateFlow();
-    // geometry.geometry.drawCubes();
     geometry.visible = false;
     this.__reflector.matrixWorld.copy( this.__mesh.matrixWorld );
 
     let renderer = this.__renderer;
     let scene = this.__scene;
     let camera = this.__camera;
-    // this.__reflector.onBeforeRender( this.__renderer, this.__scene, this.__camera );
     let reflectorWorldPosition = new THREE.Vector3(); // this reflector position
     let cameraWorldPosition = new THREE.Vector3(); // camera position
     let rotationMatrix = new THREE.Matrix4(); // camera rotation matrix
@@ -108,11 +105,9 @@ export default class GpuPipeModelWater {
     let q = new THREE.Vector4();
 
     reflectorWorldPosition.setFromMatrixPosition( this.__reflector.matrixWorld );
-    // reflectorWorldPosition.y = -3.0;
-    // reflectorWorldPosition.y = this.geometry.maxLvl;
+    // reflectorWorldPosition.y = 1.0;
     cameraWorldPosition.setFromMatrixPosition( camera.matrixWorld );
     rotationMatrix.extractRotation( this.__reflector.matrixWorld );
-    // rotationMatrix.makeRotationX(-Math.PI / 2);
     
     // rotate normal without translate
     normal.set( 0, 1, 0 );
