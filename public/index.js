@@ -49,6 +49,11 @@ let options = {
 	sculptClearSculpts: function () {
 		gpuSkulpt.clear();
 	},
+	ambientLightIntensity: 0.4,
+	// lightDirection: new THREE.Vector3(1.0, 0.5, 0.275),
+	lightXDir: 1.0,
+	lightYDir: 0.5,
+	lightZDir: 0.275,
 };
 let clock = new THREE.Clock();
 let scene = new THREE.Scene();
@@ -98,6 +103,14 @@ function initWater() {
 		density: WATER_DENSITY,
 	})
 	scene.add(waterMesh);
+}
+
+function initLights() {
+	const newLightDir = new THREE.Vector3( options.lightXDir, options.lightYDir, options.lightZDir );
+	gpuSkulpt.setAmbientLightIntensity(options.ambientLightIntensity);
+	gpuSkulpt.setLightDirection(newLightDir);
+	gpuWater.setAmbientLightIntensity(options.ambientLightIntensity);
+	gpuWater.setLightDirection(newLightDir);
 }
 
 function initTerrain() {
@@ -409,6 +422,38 @@ function setupGui() {
 		.name('Source Amount')
 		.listen()
 		
+	//Light folder
+	let lightFolder = gui.addFolder('Lights');
+	lightFolder.open();
+
+	lightFolder.add(options, 'ambientLightIntensity', 0.0, 0.7)
+		.name('Intencity ambient light')
+		.listen()
+		.onChange(function(value) {
+			initLights();
+		})
+
+	lightFolder.add(options, 'lightXDir', -1.0, 1.0)
+		.name('X light direction')
+		.listen()
+		.onChange(function(value) {
+			initLights();
+		})
+
+	lightFolder.add(options, 'lightYDir', -1.0, 1.0)
+		.name('Y light direction')
+		.listen()
+		.onChange(function(value) {
+			initLights();
+		})
+
+	lightFolder.add(options, 'lightZDir', -1.0, 1.0)
+		.name('Z light direction')
+		.listen()
+		.onChange(function(value) {
+			initLights();
+		})
+		
 }
 
 
@@ -430,6 +475,7 @@ initCamera();
 loadImage(terrainImageSettings[options.terrainImage]);
 initTerrain();
 initWater();
+initLights();
 loadSkyBox(skyBoxTextures[options.skyBoxTexture]);
 setupEvents();
 setupGui();

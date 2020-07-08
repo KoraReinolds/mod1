@@ -129,6 +129,8 @@ export default class GpuSkulpt {
   __setupVtf() {
     this.__mesh.material = new THREE.ShaderMaterial({
       uniforms: {
+        uLightDirection: { type: 'v3', value: new THREE.Vector3() },
+        uAmbientLightIntensity: { type: 'f', value: null },
         uImageTexture: { type: 't', value: null },
         uTexture: { type: 't', value: null },
         uTexelSize: { type: 'v2', value: new THREE.Vector2(1.0 / this.__res, 1.0 / this.__res) },
@@ -264,6 +266,14 @@ export default class GpuSkulpt {
   
   setBrushAmount(amount) {
     this.__skulptMaterial.uniforms['uSculptAmount'].value = amount;
+  };
+  
+  setAmbientLightIntensity(intencity) {
+    this.__mesh.material.uniforms['uAmbientLightIntensity'].value = intencity;
+  };
+
+  setLightDirection(dir) {
+    this.__mesh.material.uniforms['uLightDirection'].value.copy(dir);
   };
 
   static get ADD() {

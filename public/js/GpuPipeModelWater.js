@@ -387,13 +387,14 @@ export default class GpuPipeModelWater {
             1.0, // scale
           ),
         },
+        uLightDirection: { type: 'v3', value: new THREE.Vector3() },
+        uAmbientLightIntensity: { type: 'f', value: null },
         uColor: { type: 'c', value: null },
         uTextureMatrix: { value: this.__textureMatrix },
         uTextureNormalMap0: { type: 'sampler2D', value: this.__normalMapTexture0 },
         uTextureNormalMap1: { type: 'sampler2D', value: this.__normalMapTexture1 },
         uTextureReflectionMap: { type: 'sampler2D', value: this.__emptyTexture },
         uFlowDirection: { type: 'v2', value: new THREE.Vector2( 0, -1 ) },
-
         uTexture: { type: 't', value: this.__rttRenderTarget1.texture },
         uTexelSize: { type: 'v2', value: new THREE.Vector2(this.__texelSize, this.__texelSize) },
         uTexelWorldSize: { type: 'v2', value: new THREE.Vector2(this.__segmentSize, this.__segmentSize) },
@@ -514,5 +515,13 @@ export default class GpuPipeModelWater {
     this.__isFlooding = true;
     this.__floodAmount = volume / (this.__size * this.__size);
   }
+
+  setAmbientLightIntensity(intencity) {
+    this.__mesh.material.uniforms['uAmbientLightIntensity'].value = intencity;
+  };
+
+  setLightDirection(dir) {
+    this.__mesh.material.uniforms['uLightDirection'].value.copy(dir);
+  };
 
 }

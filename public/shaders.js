@@ -182,7 +182,7 @@ export default {
       "uniform vec4 uConfig;",
 
       "uniform vec3 uBaseColor;",
-      "uniform vec3 uAmbientLightColor;",
+      "uniform vec3 uLightDirection;",
       "uniform float uAmbientLightIntensity;",
 
       "uniform sampler2D uNormalTexture0;",
@@ -220,7 +220,7 @@ export default {
         
         "vec4 reflectColor = texture2D( uTextureReflectionMap, vec2( 1.0 - uv.x, uv.y ) );",
         //ambient component
-        "vec3 ambient = uAmbientLightColor * uAmbientLightIntensity;",
+        "vec3 ambient = vec3(1.0, 1.0, 1.0) * uAmbientLightIntensity;",
 
         //diffuse component
         "vec3 diffuse = vec3(0.0);",
@@ -229,7 +229,7 @@ export default {
         "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
         "diffuse += normalModulator * vec3(1.0, 1.0, 1.0);",
 
-        "gl_FragColor = vec4(reflectColor.xyz * diffuse, 0.66);",
+        "gl_FragColor = vec4(reflectColor.xyz * (ambient + diffuse), 0.6);",
 
       "}"
 
@@ -239,10 +239,9 @@ export default {
 
       //Fragment shader that does basic lambert shading.
       //This is the version that overlays a circular cursor patch.
-
       "uniform sampler2D uImageTexture;",
       "uniform vec3 uBaseColor;",
-      "uniform vec3 uAmbientLightColor;",
+      "uniform vec3 uLightDirection;",
       "uniform float uAmbientLightIntensity;",
 
       "uniform int uShowCursor;",
@@ -254,17 +253,15 @@ export default {
       "varying vec3 vViewNormal;",
       "varying vec2 vUv;",
 
-      THREE.ShaderChunk['shadowmap_pars_fragment'],
-
       "void main() {",
 
         //ambient component
-        "vec3 ambient = uAmbientLightColor * uAmbientLightIntensity;",
+        "vec3 ambient = vec3(1.0, 1.0, 1.0) * uAmbientLightIntensity;",
 
         //diffuse component
         "vec3 diffuse = vec3(0.0);",
         //combine components to get final color
-        "vec4 lightVector = viewMatrix * vec4(vec3(1.0, 0.5, 0.275), 0.0);",
+        "vec4 lightVector = viewMatrix * vec4(uLightDirection, 0.0);",
         "float normalModulator = dot(normalize(vViewNormal), normalize(lightVector.xyz));",
         "diffuse += normalModulator * vec3(1.0, 1.0, 1.0);",
         "vec3 finalColor = texture2D(uImageTexture, vUv).xyz * (ambient + diffuse);",
@@ -276,8 +273,6 @@ export default {
         "}",
 
         "gl_FragColor = vec4(finalColor, 1.0);",
-
-        THREE.ShaderChunk['shadowmap_fragment'],
 
       "}"
 
