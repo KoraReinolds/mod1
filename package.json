@@ -7,7 +7,7 @@
     "express": "^4.17.1",
     "simplex-noise": "^2.4.0",
     "stackblur-canvas": "^2.3.0",
-    "three": "^0.117.1",
+    "three": "^0.125.0",
     "three-dat.gui": "^2.0.6"
   },
   "devDependencies": {
